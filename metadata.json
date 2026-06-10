@@ -1,0 +1,6 @@
+{
+  "name": "Accessible AI Study Buddy",
+  "description": "An AI-powered learning assistant that converts materials to notes, generates quizzes, responds via active tutoring, and supports custom audio and visual accessibility features.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
