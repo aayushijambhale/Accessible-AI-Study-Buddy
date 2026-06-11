@@ -1,168 +1,78 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
 import { createServer as createViteServer } from "vite";
-import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import helmet from "helmet";
+import { rateLimit } from "express-rate-limit";
+const pdfParse = require("pdf-parse");
+const cloudinary = require("cloudinary").v2;
 
-// Load environment variables
+// Import custom application services
+import UnifiedDB, { User, Note, Quiz, QuizHistory, ChatSession, Caption, Upload } from "./src/db/mongodb";
+import { AIService } from "./src/server/aiService";
+import { AuthService } from "./src/server/authService";
+
+// Load Environment Keys
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
-const JWT_SECRET = process.env.JWT_SECRET || "accessible_study_buddy_secret_key_13579";
 
-// Ensure data folder exists
-const DATA_DIR = path.join(process.cwd(), "data");
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+// Hard stop checking on missing JWT key in alignment with strict Phase 4 guidelines
+if (!process.env.JWT_SECRET) {
+  console.error("❌ FATAL: JWT_SECRET environment variable is missing. Stop server startup.");
+  process.exit(1);
 }
 
-const DB_FILE = path.join(DATA_DIR, "db.json");
+// -------------------------------------------------------------
+// MIDLLEWARE CONFIGURATIONS (Phase 12 Rate Limiting & Hardening)
+// -------------------------------------------------------------
 
-// Define basic database structure
-interface User {
-  id: string;
-  email: string;
-  passwordHash: string;
-  fullName: string;
-  voiceSettings: {
-    enabled: boolean;
-    rate: number;
-    pitch: number;
-    voiceName: string;
-    contrastMode: boolean; // Accessibility configuration
-    textZoom: "normal" | "large" | "extra-large";
-  };
-  studyHours: number;
-  studyLogs: { date: string; minutes: number }[];
-}
+// Security context hardening with Helmet
+app.use(helmet({
+  contentSecurityPolicy: false, // Keep disabled for easy preview iframe loading
+  crossOriginEmbedderPolicy: false
+}));
 
-interface Note {
-  id: string;
-  userId: string;
-  title: string;
-  rawContent: string;
-  summary: string;
-  bulletPoints: string[];
-  easyExplanation: string;
-  examNotes: string;
-  keyDefinitions: { term: string; definition: string }[];
-  createdAt: string;
-}
+// Setup rate limits: 100 requests per 15 minutes limit by default, 20 requests for logins
+const standardLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 150,
+  message: { error: "Too many requests from this address. Please retry after some minutes." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-interface QuizQuestion {
-  id: string;
-  question: string;
-  type: "mcq" | "boolean" | "short";
-  options: string[];
-  correctAnswer: string;
-  explanation: string;
-}
+const strictAuthLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 20,
+  message: { error: "Too many login/registration queries. Throttled for safety." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-interface Quiz {
-  id: string;
-  noteId: string;
-  userId: string;
-  title: string;
-  questions: QuizQuestion[];
-  createdAt: string;
-}
-
-interface QuizHistoryItem {
-  id: string;
-  quizId: string;
-  noteId: string;
-  userId: string;
-  title: string;
-  score: number;
-  totalQuestions: number;
-  percentage: number;
-  completedAt: string;
-}
-
-interface ChatMessage {
-  id: string;
-  sender: "user" | "ai";
-  text: string;
-  timestamp: string;
-}
-
-interface ChatSession {
-  id: string;
-  userId: string;
-  noteId: string;
-  messages: ChatMessage[];
-  updatedAt: string;
-}
-
-interface ImageCaptionReport {
-  id: string;
-  userId: string;
-  title: string;
-  description: string;
-  createdAt: string;
-}
-
-interface LocalDB {
-  users: User[];
-  notes: Note[];
-  quizzes: Quiz[];
-  quizHistory: QuizHistoryItem[];
-  chatSessions: ChatSession[];
-  captions: ImageCaptionReport[];
-}
-
-// Helper to read database
-function readDB(): LocalDB {
-  if (!fs.existsSync(DB_FILE)) {
-    const fresh: LocalDB = {
-      users: [],
-      notes: [],
-      quizzes: [],
-      quizHistory: [],
-      chatSessions: [],
-      captions: []
-    };
-    fs.writeFileSync(DB_FILE, JSON.stringify(fresh, null, 2));
-    return fresh;
-  }
-  try {
-    const raw = fs.readFileSync(DB_FILE, "utf-8");
-    return JSON.parse(raw);
-  } catch (err) {
-    console.error("DB corruption, resetting file storage", err);
-    return { users: [], notes: [], quizzes: [], quizHistory: [], chatSessions: [], captions: [] };
-  }
-}
-
-// Helper to write database
-function writeDB(data: LocalDB) {
-  fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-}
-
-// Setup bodies size limits for handling large screenshots/pasted images safely
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
-// Initialize Gemini SDK with named client parameter (as demanded by system constraints)
-let ai: GoogleGenAI | null = null;
-if (process.env.GEMINI_API_KEY) {
-  ai = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-    httpOptions: {
-      headers: {
-        "User-Agent": "aistudio-build",
-      },
-    },
+// Setup static upload directories
+const UPLOADS_DIR = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+app.use("/uploads", express.static(UPLOADS_DIR));
+
+// Configure Cloudinary if active
+if (process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
+    api_key: process.env.CLOUDINARY_API_KEY || "",
+    api_secret: process.env.CLOUDINARY_API_SECRET || ""
   });
-} else {
-  console.warn("⚠️ Warning: GEMINI_API_KEY is not defined. AI components will return demo fallbacks.");
+  console.info("☁️ Cloudinary file storage provider initialized successfully!");
 }
 
-// Dynamic authentication middleware
+// Global active JWT validation filter
 function authenticateToken(req: any, res: any, next: any) {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
@@ -171,751 +81,945 @@ function authenticateToken(req: any, res: any, next: any) {
     return res.status(401).json({ error: "Access token missing" });
   }
 
-  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
-    if (err) {
-      return res.status(403).json({ error: "Token active check failed or expired" });
-    }
-    req.user = user;
-    next();
-  });
+  const payload = AuthService.verifyToken(token);
+  if (!payload) {
+    return res.status(403).json({ error: "Signature verification failed, or session expired" });
+  }
+
+  req.user = payload;
+  next();
 }
 
-// ==========================================
-// ROUTES: AUTHENTICATION
-// ==========================================
+// -------------------------------------------------------------
+// ROUTES: AUTHENTICATION (Phase 4 Access/Refresh Tokens & OTP)
+// -------------------------------------------------------------
 
 // Register
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", strictAuthLimiter, async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
     if (!email || !password || !fullName) {
       return res.status(400).json({ error: "All profile fields are required." });
     }
 
-    const db = readDB();
-    if (db.users.find((u) => u.email.toLowerCase() === email.toLowerCase())) {
-      return res.status(400).json({ error: "User already exists with this email address." });
+    const exists = await UnifiedDB.findUserByEmail(email);
+    if (exists) {
+      return res.status(400).json({ error: "An account already exists under this email address." });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    const newUser: User = {
-      id: Math.random().toString(36).substring(2, 11),
-      email,
-      passwordHash,
+    const hashed = await AuthService.hashPassword(password);
+    const newUser = await UnifiedDB.createUser({
+      email: email.toLowerCase(),
+      passwordHash: hashed,
       fullName,
-      voiceSettings: {
-        enabled: false,
-        rate: 1.0,
-        pitch: 1.0,
-        voiceName: "",
-        contrastMode: false,
-        textZoom: "normal",
-      },
       studyHours: 0,
-      studyLogs: [{ date: new Date().toISOString().split("T")[0], minutes: 10 }]
-    };
+      studyLogs: [{ date: new Date().toISOString().split("T")[0], minutes: 10 }],
+      refreshTokens: []
+    });
 
-    db.users.push(newUser);
-    writeDB(db);
+    const accessToken = AuthService.generateAccessToken({ id: newUser.id || newUser._id, email: newUser.email });
+    const refreshToken = AuthService.generateRefreshToken({ id: newUser.id || newUser._id, email: newUser.email });
 
-    const token = jwt.sign({ id: newUser.id, email: newUser.email }, JWT_SECRET, { expiresIn: "30d" });
-    res.status(201).json({ token, user: { id: newUser.id, email: newUser.email, fullName: newUser.fullName, voiceSettings: newUser.voiceSettings } });
+    // Store refresh token
+    const rTokens = newUser.refreshTokens || [];
+    rTokens.push(refreshToken);
+    await UnifiedDB.updateUser(newUser.id || newUser._id, { refreshTokens: rTokens });
+
+    res.status(201).json({
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: newUser.id || newUser._id,
+        email: newUser.email,
+        fullName: newUser.fullName,
+        voiceSettings: newUser.voiceSettings
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
 // Login
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", strictAuthLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res.status(400).json({ error: "Email and password are required." });
+      return res.status(400).json({ error: "Email and password are required credentials." });
     }
 
-    const db = readDB();
-    const user = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase());
+    const user = await UnifiedDB.findUserByEmail(email);
     if (!user) {
-      return res.status(400).json({ error: "Invalid email or password." });
+      return res.status(401).json({ error: "Invalid email or matching password." });
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      return res.status(400).json({ error: "Invalid email or password." });
+    const matches = await AuthService.comparePasswords(password, user.passwordHash);
+    if (!matches) {
+      return res.status(401).json({ error: "Invalid email or matching password." });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "30d" });
-    res.json({ token, user: { id: user.id, email: user.email, fullName: user.fullName, voiceSettings: user.voiceSettings } });
+    const accessToken = AuthService.generateAccessToken({ id: user.id || user._id, email: user.email });
+    const refreshToken = AuthService.generateRefreshToken({ id: user.id || user._id, email: user.email });
+
+    const rTokens = user.refreshTokens || [];
+    rTokens.push(refreshToken);
+    await UnifiedDB.updateUser(user.id || user._id, { refreshTokens: rTokens });
+
+    res.json({
+      token: accessToken,
+      refreshToken,
+      user: {
+        id: user.id || user._id,
+        email: user.email,
+        fullName: user.fullName,
+        voiceSettings: user.voiceSettings
+      }
+    });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Get profile
-app.get("/api/auth/profile", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const user = db.users.find((u) => u.id === req.user.id);
-  if (!user) {
-    return res.status(404).json({ error: "User profile not found." });
+// Access Token Refresh Endpoint
+app.post("/api/auth/refresh", async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) {
+    return res.status(400).json({ error: "Refresh token is missing" });
   }
-  res.json({ id: user.id, email: user.email, fullName: user.fullName, voiceSettings: user.voiceSettings, studyHours: user.studyHours, studyLogs: user.studyLogs });
+
+  const payload = AuthService.verifyToken(refreshToken);
+  if (!payload) {
+    return res.status(403).json({ error: "Invalid refresh signature" });
+  }
+
+  const user = await UnifiedDB.findUserById(payload.id);
+  if (!user || !user.refreshTokens.includes(refreshToken)) {
+    return res.status(403).json({ error: "Token has been revoked or is invalid" });
+  }
+
+  const newAccessToken = AuthService.generateAccessToken({ id: user.id || user._id, email: user.email });
+  res.json({ token: newAccessToken });
 });
 
-// Update User Profile details (Phase 2 Authenticated Customization)
-app.put("/api/auth/profile", authenticateToken, (req: any, res) => {
-  const { fullName, email } = req.body;
-  if (!fullName || !email) {
-    return res.status(400).json({ error: "Full Name and Email Address are required for updates." });
+// Clear Session / Logout
+app.post("/api/auth/logout", async (req, res) => {
+  const { refreshToken } = req.body;
+  if (refreshToken) {
+    const payload = AuthService.verifyToken(refreshToken);
+    if (payload) {
+      const user = await UnifiedDB.findUserById(payload.id);
+      if (user) {
+        const remaining = user.refreshTokens.filter((rt: string) => rt !== refreshToken);
+        await UnifiedDB.updateUser(user.id || user._id, { refreshTokens: remaining });
+      }
+    }
+  }
+  res.json({ success: true });
+});
+
+// Forgot Password - Send OTP (Phase 4)
+app.post("/api/auth/forgot-password", strictAuthLimiter, async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    return res.status(400).json({ error: "Email address is required." });
   }
 
-  const db = readDB();
-  const userIdx = db.users.findIndex((u) => u.id === req.user.id);
-  if (userIdx === -1) {
-    return res.status(404).json({ error: "User profile not found." });
+  const user = await UnifiedDB.findUserByEmail(email);
+  if (!user) {
+    // Return friendly generic success response to prevent emails enumeration scans
+    return res.json({ success: true, message: "A test verification OTP was simulated/sent successfully if the address matches." });
   }
 
-  // Check if email already used by someone else
-  const otherUser = db.users.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.id !== req.user.id);
-  if (otherUser) {
-    return res.status(400).json({ error: "Email address is already taken by another account." });
-  }
-
-  db.users[userIdx].fullName = fullName;
-  db.users[userIdx].email = email;
-  writeDB(db);
-
+  const otp = AuthService.generateOTP(email);
   res.json({
     success: true,
-    user: {
-      id: db.users[userIdx].id,
-      email: db.users[userIdx].email,
-      fullName: db.users[userIdx].fullName,
-      voiceSettings: db.users[userIdx].voiceSettings,
-      studyHours: db.users[userIdx].studyHours,
-      studyLogs: db.users[userIdx].studyLogs
-    }
+    message: `OTP issued successfully. In a real system, this goes to email. Click Console to read your safe active test code!`,
+    testOTP: otp // Return OTP directly in response for immediate testing comfort
   });
 });
 
-// Update voice and Accessibility preference settings
-app.put("/api/auth/preferences", authenticateToken, (req: any, res) => {
+// Reset Password with OTP Code (Phase 4)
+app.post("/api/auth/reset-password", strictAuthLimiter, async (req, res) => {
+  const { email, otpCode, newPassword } = req.body;
+  if (!email || !otpCode || !newPassword) {
+    return res.status(400).json({ error: "Email, OTP Code and New Password are required." });
+  }
+
+  const verified = AuthService.verifyOTP(email, otpCode);
+  if (!verified) {
+    return res.status(400).json({ error: "Invalid OTP code, or OTP expired." });
+  }
+
+  const user = await UnifiedDB.findUserByEmail(email);
+  if (!user) {
+    return res.status(404).json({ error: "User accounts not resolved." });
+  }
+
+  const hashed = await AuthService.hashPassword(newPassword);
+  await UnifiedDB.updateUser(user.id || user._id, { passwordHash: hashed });
+
+  res.json({ success: true, message: "Credential reset successful. Please login now with your new password." });
+});
+
+// Get User Profile
+app.get("/api/auth/profile", authenticateToken, async (req: any, res) => {
+  const user = await UnifiedDB.findUserById(req.user.id);
+  if (!user) {
+    return res.status(404).json({ error: "User accounts profile not located." });
+  }
+  res.json({
+    id: user.id || user._id,
+    email: user.email,
+    fullName: user.fullName,
+    voiceSettings: user.voiceSettings,
+    studyHours: user.studyHours,
+    studyLogs: user.studyLogs
+  });
+});
+
+// Update Profile Detail Attributes
+app.put("/api/auth/profile", authenticateToken, async (req: any, res) => {
+  const { fullName, email } = req.body;
+  if (!fullName || !email) {
+    return res.status(400).json({ error: "Full Name and Email Address are required fields." });
+  }
+
+  const otherUser = await UnifiedDB.findUserByEmail(email);
+  if (otherUser && String(otherUser._id || otherUser.id) !== String(req.user.id)) {
+    return res.status(400).json({ error: "Email address is already in use by another user." });
+  }
+
+  const updated = await UnifiedDB.updateUser(req.user.id, { fullName, email: email.toLowerCase() });
+  if (!updated) {
+    return res.status(404).json({ error: "Account profile was not updated." });
+  }
+
+  res.json({ success: true, user: updated });
+});
+
+// Update Accessibility Preferences
+app.put("/api/auth/preferences", authenticateToken, async (req: any, res) => {
   const { voiceSettings } = req.body;
   if (!voiceSettings) {
-    return res.status(400).json({ error: "Preferences payload is required." });
+    return res.status(400).json({ error: "Settings payload is empty." });
   }
 
-  const db = readDB();
-  const userIdx = db.users.findIndex((u) => u.id === req.user.id);
-  if (userIdx === -1) {
-    return res.status(404).json({ error: "User profile not encountered." });
-  }
-
-  db.users[userIdx].voiceSettings = {
-    ...db.users[userIdx].voiceSettings,
-    ...voiceSettings
-  };
-  writeDB(db);
-  res.json({ success: true, voiceSettings: db.users[userIdx].voiceSettings });
+  const updated = await UnifiedDB.updateUser(req.user.id, { voiceSettings });
+  res.json({ success: true, voiceSettings: updated.voiceSettings });
 });
 
 
-// ==========================================
-// ROUTES: PDF TO NOTES CONVERTER
-// ==========================================
+// -------------------------------------------------------------
+// ROUTES: PDF PROCESSING & STORAGE MANAGEMENT (Phase 1 & 5)
+// -------------------------------------------------------------
 
-// Create / Process Study Material Notes
+// Read real PDF bytes in background (Phase 1)
+app.post("/api/notes/parse-pdf", authenticateToken, async (req: any, res) => {
+  const { pdfBase64 } = req.body;
+  if (!pdfBase64) {
+    return res.status(400).json({ error: "No PDF data base64 string provided." });
+  }
+
+  try {
+    const rawBuffer = Buffer.from(pdfBase64, "base64");
+    const result = await pdfParse(rawBuffer);
+    res.json({
+      text: result.text || "",
+      pagesCount: result.numpages,
+      metadata: result.metadata
+    });
+  } catch (err: any) {
+    console.error("Backend pdf-parse failed:", err);
+    res.status(500).json({ error: `PDF extraction failed: ${err.message}` });
+  }
+});
+
+// Secure Cloudinary or Local uploads pipeline (Phase 5)
+app.post("/api/upload", authenticateToken, async (req: any, res) => {
+  const { fileBase64, fileName, fileType } = req.body;
+  if (!fileBase64 || !fileName || !fileType) {
+    return res.status(400).json({ error: "fileBase64, fileName and fileType parameters are required." });
+  }
+
+  try {
+    let fileUrl = "";
+
+    // Upload to Cloudinary if configured
+    if (process.env.CLOUDINARY_CLOUD_NAME) {
+      const resp = await cloudinary.uploader.upload(
+        `data:${fileType};base64,${fileBase64}`,
+        { resource_type: "auto" }
+      );
+      fileUrl = resp.secure_url;
+    } else {
+      // Local fallback mapping
+      const cleanName = `${Date.now()}_${fileName.replace(/\s+/g, "_")}`;
+      const savePath = path.join(UPLOADS_DIR, cleanName);
+      fs.writeFileSync(savePath, Buffer.from(fileBase64, "base64"));
+      
+      const hostUrl = process.env.APP_URL || `http://0.0.0.0:${PORT}`;
+      fileUrl = `${hostUrl}/uploads/${cleanName}`;
+    }
+
+    // Register Upload session under user ownership in database
+    const newUpload = await UnifiedDB.createUpload({
+      userId: req.user.id,
+      fileName,
+      fileUrl,
+      fileType,
+      fileSize: `${Math.round(fileBase64.length * 0.75 / 1024)} KB`
+    });
+
+    res.json({ url: fileUrl, upload: newUpload });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// -------------------------------------------------------------
+// ROUTES: STUDY GUIDES & GENERATION SERVICES (Phase 6, 7, 8, 9)
+// -------------------------------------------------------------
+
+// Create New Note With Vector Embeddings (Phase 7 RAG)
 app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
   const { title, content } = req.body;
   if (!content || !title) {
-    return res.status(400).json({ error: "Title and study material text are required." });
+    return res.status(400).json({ error: "A title and study material content are required." });
   }
 
   try {
-    let summaryData = {
-      summary: "This is a fallback summary since Gemini API was offline or is currently provisioning.",
-      bulletPoints: ["Keep study sessions consistent.", "Break content down visually.", "Read aloud definitions."],
-      easyExplanation: "A super simple explanation describing core concepts under 5-year-old terms.",
-      examNotes: "Quick reminder definitions to study before the evaluation.",
-      keyDefinitions: [{ term: "Study material", definition: "Information and text reviewed for a class" }]
-    };
+    // Generate summaries, explanations, exam points and key glossary using high performance Gemini (Phase 6)
+    const notesResult = await AIService.generateStudyBuddyNotes(title, content);
 
-    if (ai) {
+    // Formulate 6 flashcards by default under standard Note template (Phase 8)
+    const flashcardsData = await AIService.generateFlashcards(content);
+    const flashcards = flashcardsData.map((f, i) => ({
+      id: `fc_${Math.random().toString(36).substring(2, 9)}`,
+      question: f.question,
+      answer: f.answer,
+      bookmarked: false,
+      score: 0
+    }));
+
+    // Formulate clean MindMap hierarchy (Phase 9)
+    const mindmapData = await AIService.generateMindMap(title, content);
+
+    // Compute text segment vectors for real RAG embeddings mapping (Phase 7)
+    const rawChunks = AIService.chunkContent(content);
+    const ragChunks = [];
+    
+    // Generate text vectors asynchronously
+    for (let i = 0; i < rawChunks.length; i++) {
       try {
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `Create structured study assistants and complete comprehensive summaries.
-          Target content to summarize: "${content.replace(/"/g, '\\"')}"
-          
-          You must generate standard JSON conforming perfectly to this scheme:
-          {
-            "summary": "a beautiful summary of the content in 2-3 paragraphs",
-            "bulletPoints": ["important point 1", "important point 2", "important point 3"],
-            "easyExplanation": "a simplified explanation of these same concepts using robust real-world metaphors and easy conversational English language to support people with learning disabilities or screen readers",
-            "examNotes": "specific crucial points, formulas, high-yield items or bullet cues critical for scoring well in an exam",
-            "keyDefinitions": [
-               { "term": "first concept", "definition": "exact visual or clear definition" }
-            ]
-          }`,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                summary: { type: Type.STRING },
-                bulletPoints: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING }
-                },
-                easyExplanation: { type: Type.STRING },
-                examNotes: { type: Type.STRING },
-                keyDefinitions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      term: { type: Type.STRING },
-                      definition: { type: Type.STRING }
-                    },
-                    required: ["term", "definition"]
-                  }
-                }
-              },
-              required: ["summary", "bulletPoints", "easyExplanation", "examNotes", "keyDefinitions"]
-            }
-          }
+        const textSegment = rawChunks[i];
+        let vector: number[] = [];
+        if (AIService.isGeminiAvailable()) {
+          vector = await AIService.createEmbedding(textSegment);
+        }
+        ragChunks.push({
+          text: textSegment,
+          pageNumber: Math.floor(i / 2) + 1,
+          embedding: vector
         });
-
-        const rawText = response.text || "{}";
-        summaryData = JSON.parse(rawText.trim());
-      } catch (geminiErr: any) {
-        console.error("Gemini failed during summarizing: ", geminiErr);
-        // Fall back gracefully to keep system testable
+      } catch (err) {
+        console.warn(`Vector embeddings formulation failed on chunk ${i}:`, err);
       }
     }
 
-    const db = readDB();
-    const newNote: Note = {
-      id: "note_" + Math.random().toString(36).substring(2, 11),
+    // Save notes to database
+    const newNote = await UnifiedDB.createNote({
       userId: req.user.id,
       title,
       rawContent: content,
-      ...summaryData,
-      createdAt: new Date().toISOString()
-    };
+      ...notesResult,
+      flashcards,
+      mindMap: mindmapData,
+      ragChunks
+    });
 
-    db.notes.push(newNote);
-    
-    // Add study logs progress
-    const uIdx = db.users.findIndex(u => u.id === req.user.id);
-    if (uIdx !== -1) {
-      db.users[uIdx].studyHours = (db.users[uIdx].studyHours || 0) + 0.5;
-      const today = new Date().toISOString().split("T")[0];
-      const logIdx = db.users[uIdx].studyLogs.findIndex(l => l.date === today);
-      if (logIdx !== -1) {
-        db.users[uIdx].studyLogs[logIdx].minutes += 15;
+    // Credit study hours for notes creation
+    const user = await UnifiedDB.findUserById(req.user.id);
+    if (user) {
+      const todayString = new Date().toISOString().split("T")[0];
+      const logs = user.studyLogs || [];
+      const index = logs.findIndex((l: any) => l.date === todayString);
+      if (index !== -1) {
+        logs[index].minutes += 15;
       } else {
-        db.users[uIdx].studyLogs.push({ date: today, minutes: 15 });
+        logs.push({ date: todayString, minutes: 15 });
       }
+      await UnifiedDB.updateUser(req.user.id, {
+        studyHours: (user.studyHours || 0) + 0.5,
+        studyLogs: logs
+      });
     }
-    
-    writeDB(db);
+
     res.status(201).json(newNote);
+  } catch (err: any) {
+    console.error("Notes creation process failed:", err);
+    if (err.message === "GEMINI_API_KEY_MISSING") {
+      res.status(403).json({ error: "GEMINI_API_KEY_MISSING" });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// Fetch All Notes
+app.get("/api/notes", authenticateToken, async (req: any, res) => {
+  try {
+    const list = await UnifiedDB.findNotesByUser(req.user.id);
+    res.json(list);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Fetch all notes
-app.get("/api/notes", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const userNotes = db.notes.filter((n) => n.userId === req.user.id);
-  res.json(userNotes);
-});
-
-// Fetch single note details
-app.get("/api/notes/:id", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const note = db.notes.find((n) => n.id === req.params.id && n.userId === req.user.id);
-  if (!note) {
-    return res.status(404).json({ error: "Study note not located." });
+// Fetch Single Note details
+app.get("/api/notes/:id", authenticateToken, async (req: any, res) => {
+  try {
+    const note = await UnifiedDB.findNoteById(req.params.id);
+    if (!note || String(note.userId) !== String(req.user.id)) {
+      return res.status(404).json({ error: "Study materials not located." });
+    }
+    res.json(note);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(note);
 });
 
-// Delete note
-app.delete("/api/notes/:id", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const noteIdx = db.notes.findIndex((n) => n.id === req.params.id && n.userId === req.user.id);
-  if (noteIdx === -1) {
-    return res.status(404).json({ error: "Study note not located." });
+// Delete Note
+app.delete("/api/notes/:id", authenticateToken, async (req: any, res) => {
+  try {
+    const success = await UnifiedDB.deleteNote(req.params.id, req.user.id);
+    if (!success) {
+      return res.status(404).json({ error: "Could not delete note." });
+    }
+    res.json({ success: true, message: "Note completed and archived." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  db.notes.splice(noteIdx, 1);
-  writeDB(db);
-  res.json({ success: true, message: "Note deleted successfully." });
 });
 
 
-// ==========================================
-// ROUTES: QUIZ GENERATOR
-// ==========================================
+// -------------------------------------------------------------
+// ROUTES: FLASHCARD BOOKMARK & SHUFFLING ACTIONS (Phase 8)
+// -------------------------------------------------------------
 
-// Generate dynamic quiz from note ID
+// Toggle Flashcard Bookmark
+app.put("/api/notes/:id/flashcards/:cardId", authenticateToken, async (req: any, res) => {
+  try {
+    const note = await UnifiedDB.findNoteById(req.params.id);
+    if (!note || String(note.userId) !== String(req.user.id)) {
+      return res.status(404).json({ error: "Note not located." });
+    }
+
+    const cards = note.flashcards || [];
+    const editIdx = cards.findIndex((fc: any) => fc.id === req.params.cardId);
+    if (editIdx !== -1) {
+      cards[editIdx].bookmarked = !cards[editIdx].bookmarked;
+      await UnifiedDB.updateNote(note.id || note._id, { flashcards: cards });
+      return res.json({ success: true, flashcard: cards[editIdx] });
+    }
+    res.status(404).json({ error: "Flashcard item not located in study workbook." });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// -------------------------------------------------------------
+// ROUTES: PRACTICAL QUIZZES CENTER (Phase 2 & 13)
+// -------------------------------------------------------------
+
+// Formulate Quiz Questions
 app.post("/api/quiz/generate", authenticateToken, async (req: any, res) => {
-  const { noteId, quizType = "mix", numQuestions = 5 } = req.body;
+  const { noteId, quizType = "mcq", numQuestions = 5 } = req.body;
   if (!noteId) {
-    return res.status(400).json({ error: "Note ID is required to generate quiz." });
-  }
-
-  const db = readDB();
-  const note = db.notes.find((n) => n.id === noteId && n.userId === req.user.id);
-  if (!note) {
-    return res.status(404).json({ error: "Associated note resource not found." });
+    return res.status(400).json({ error: "A valid note ID reference is required." });
   }
 
   try {
-    let quizQuestions: QuizQuestion[] = [
-      {
-        id: "q1",
-        question: `Based on your note '${note.title}', what is one core concept?`,
-        type: "mcq",
-        options: ["Core definition", "Unrelated option A", "Unrelated option B", "Incorrect Answer"],
-        correctAnswer: "Core definition",
-        explanation: "This is a general reinforcement item generated automatically."
-      },
-      {
-        id: "q2",
-        question: "Active learning improves academic memory retention. True or false?",
-        type: "boolean",
-        options: ["True", "False"],
-        correctAnswer: "True",
-        explanation: "Research confirms that active retrieval-practice yields better memory encoding."
-      }
-    ];
-
-    if (ai) {
-      try {
-        const typeInstruction = 
-          quizType === "mcq" 
-            ? "Create ONLY multiple choice (mcq) questions, each with exactly 4 distinct choices in options."
-            : quizType === "boolean"
-            ? "Create ONLY True or False (boolean) questions, with options array containing exactly ['True', 'False']."
-            : quizType === "short"
-            ? "Create ONLY Short Answer questions (short) where we test the student's direct knowledge recall. Options array must be empty []. The correctAnswer should be a precise single word or short phrase."
-            : "Create a mix of MCQ, True/False, and short answer questions.";
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: `Create a set of ${numQuestions} educational quiz questions derived from the following study note.
-          Title: "${note.title}"
-          Content: "${note.rawContent.slice(0, 3000).replace(/"/g, '\\"')}"
-          
-          Specific constraint: ${typeInstruction}
-          
-          You must generate a standard JSON array of questions, conforming exactly to this schema:
-          {
-            "questions": [
-              {
-                "id": "string_unique_hash",
-                "question": "The question text, perfect for screen readers to spell out",
-                "type": "mcq" or "boolean" or "short",
-                "options": ["Option A", "Option B", "Option C", "Option D"] (MUST be exactly ['True', 'False'] for boolean, and empty [] for short answer),
-                "correctAnswer": "Exact text matching the correct option or exact direct answer keyword",
-                "explanation": "Clear educational explanation describing why this choice is correct."
-              }
-            ]
-          }`,
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.OBJECT,
-              properties: {
-                questions: {
-                  type: Type.ARRAY,
-                  items: {
-                    type: Type.OBJECT,
-                    properties: {
-                      id: { type: Type.STRING },
-                      question: { type: Type.STRING },
-                      type: { type: Type.STRING },
-                      options: {
-                        type: Type.ARRAY,
-                        items: { type: Type.STRING }
-                      },
-                      correctAnswer: { type: Type.STRING },
-                      explanation: { type: Type.STRING }
-                    },
-                    required: ["id", "question", "type", "options", "correctAnswer", "explanation"]
-                  }
-                }
-              },
-              required: ["questions"]
-            }
-          }
-        });
-
-        const rawText = response.text || "{}";
-        const parsed = JSON.parse(rawText.trim());
-        if (parsed.questions && parsed.questions.length > 0) {
-          quizQuestions = parsed.questions;
-        }
-      } catch (gemErr) {
-        console.error("Gemini failed during quiz formulation: ", gemErr);
-      }
+    const note = await UnifiedDB.findNoteById(noteId);
+    if (!note || String(note.userId) !== String(req.user.id)) {
+      return res.status(404).json({ error: "Notes reference is invalid or unlinked." });
     }
 
-    const newQuiz: Quiz = {
-      id: "quiz_" + Math.random().toString(36).substring(2, 11),
+    const questions = await AIService.generateStudyQuiz(note.title, note.rawContent, quizType, numQuestions);
+    const newQuiz = await UnifiedDB.createQuiz({
       noteId,
       userId: req.user.id,
       title: `Practice Evaluation: ${note.title} (${quizType.toUpperCase()})`,
-      questions: quizQuestions,
-      createdAt: new Date().toISOString()
-    };
+      questions
+    });
 
-    db.quizzes.push(newQuiz);
-    writeDB(db);
     res.status(201).json(newQuiz);
+  } catch (err: any) {
+    console.error("Quiz creation failed:", err);
+    if (err.message === "GEMINI_API_KEY_MISSING") {
+      res.status(403).json({ error: "GEMINI_API_KEY_MISSING" });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// Fetch Note Quiz Set
+app.get("/api/quiz/note/:noteId", authenticateToken, async (req: any, res) => {
+  try {
+    const list = await UnifiedDB.findQuizzesByNote(req.params.noteId, req.user.id);
+    res.json(list);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Fetch active quizzes for a note
-app.get("/api/quiz/note/:noteId", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const quizzes = db.quizzes.filter((q) => q.noteId === req.params.noteId && q.userId === req.user.id);
-  res.json(quizzes);
-});
-
-// Save a completed quiz history item
-app.post("/api/quiz/submit", authenticateToken, (req: any, res) => {
+// Submit Quiz and Track Evaluation Scoring
+app.post("/api/quiz/submit", authenticateToken, async (req: any, res) => {
   const { quizId, score, totalQuestions, title, noteId } = req.body;
   if (!quizId || score === undefined || !totalQuestions) {
-    return res.status(400).json({ error: "Incomplete quiz report attributes." });
+    return res.status(400).json({ error: "Quiz submission coordinates are incomplete." });
   }
-
-  const db = readDB();
-  const historyItem: QuizHistoryItem = {
-    id: "history_" + Math.random().toString(36).substring(2, 11),
-    quizId,
-    noteId: noteId || "",
-    userId: req.user.id,
-    title: title || "Completed Study Evaluation",
-    score,
-    totalQuestions,
-    percentage: Math.round((score / totalQuestions) * 100),
-    completedAt: new Date().toISOString()
-  };
-
-  db.quizHistory.push(historyItem);
-  
-  // Log study analytics
-  const uIdx = db.users.findIndex(u => u.id === req.user.id);
-  if (uIdx !== -1) {
-    db.users[uIdx].studyHours = (db.users[uIdx].studyHours || 0) + 0.2;
-  }
-
-  writeDB(db);
-  res.status(201).json(historyItem);
-});
-
-// Fetch Quiz history
-app.get("/api/quiz/history", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const userHistory = db.quizHistory.filter((h) => h.userId === req.user.id);
-  res.json(userHistory);
-});
-
-// Fetch Quiz Leaderboard based on real users active scores
-app.get("/api/quiz/leaderboard", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const leaderboard = db.users.map((user) => {
-    const userQuizzes = db.quizHistory.filter((h) => h.userId === user.id);
-    const avgScore = userQuizzes.length > 0
-      ? Math.round(userQuizzes.reduce((acc, curr) => acc + curr.percentage, 0) / userQuizzes.length)
-      : 0;
-    return {
-      userId: user.id,
-      fullName: user.fullName || "Anonymous Student",
-      email: user.email,
-      quizzesCount: userQuizzes.length,
-      averageScore: avgScore,
-      studyHours: Math.round((user.studyHours || 0) * 10) / 10
-    };
-  });
-
-  // Sort: highest average score first, then most quizzes taken, then studyHours
-  leaderboard.sort((a, b) => b.averageScore - a.averageScore || b.quizzesCount - a.quizzesCount || b.studyHours - a.studyHours);
-
-  res.json(leaderboard);
-});
-
-
-// ==========================================
-// ROUTES: AI TUTOR CHATBOT
-// ==========================================
-
-// Send Chat Message to Context-Aware AI Tutor
-app.post("/api/tutor/chat", authenticateToken, async (req: any, res) => {
-  const { noteId, userMessage, mode, chatSessionId } = req.body; // mode: "normal" | "easy" | "exam_prep"
-  if (!userMessage) {
-    return res.status(400).json({ error: "Your query message content is blank." });
-  }
-
-  const db = readDB();
-  let noteContext = "";
-  let noteTitle = "General Knowledge";
-  if (noteId) {
-    const note = db.notes.find((n) => n.id === noteId && n.userId === req.user.id);
-    if (note) {
-      noteContext = note.rawContent;
-      noteTitle = note.title;
-    }
-  }
-
-  // Find or create session
-  let session = db.chatSessions.find(
-    (s) => s.userId === req.user.id && (chatSessionId ? s.id === chatSessionId : (noteId ? s.noteId === noteId : true))
-  );
-
-  if (!session) {
-    session = {
-      id: chatSessionId || "chat_" + Math.random().toString(36).substring(2, 11),
-      userId: req.user.id,
-      noteId: noteId || "",
-      messages: [],
-      updatedAt: new Date().toISOString()
-    };
-    db.chatSessions.push(session);
-  }
-
-  // Push user message
-  session.messages.push({
-    id: "msg_" + Math.random().toString(36).substring(2, 11),
-    sender: "user",
-    text: userMessage,
-    timestamp: new Date().toISOString()
-  });
 
   try {
-    let aiResponseText = "Yes, I understand what you represent. Currently checking detailed files for study buddy prompts.";
-    
-    // Choose specific system instruction depending on pedagogical mode (Phase 6 requirements)
-    let modeInstruction = "Explain academic terms clearly, maintaining a rich, supportive tone.";
-    if (mode === "easy") {
-      modeInstruction = "Use Easy Explanation Mode. Act like a highly empathetic, brilliant mentor explaining topics using everyday household analogies, simple vocabulary, and short conversational terms. This promotes extreme accessibility for auditory, visual, or dynamic learning styles.";
-    } else if (mode === "exam_prep") {
-      modeInstruction = "Use Exam Preparation Mode. Focus heavily on technical terminology, test formulas, practice recall challenges, memory mnemonics, and strategic exam-passing techniques.";
+    const historyItem = await UnifiedDB.createQuizHistory({
+      quizId,
+      noteId,
+      userId: req.user.id,
+      title: title || "Completed Assessment",
+      score,
+      totalQuestions,
+      percentage: Math.round((score / totalQuestions) * 100)
+    });
+
+    // Credit study hours for evaluation participation
+    const user = await UnifiedDB.findUserById(req.user.id);
+    if (user) {
+      const today = new Date().toISOString().split("T")[0];
+      const logs = user.studyLogs || [];
+      const logIdx = logs.findIndex((l: any) => l.date === today);
+      if (logIdx !== -1) {
+        logs[logIdx].minutes += 12;
+      } else {
+        logs.push({ date: today, minutes: 12 });
+      }
+      await UnifiedDB.updateUser(req.user.id, {
+        studyHours: (user.studyHours || 0) + 0.2,
+        studyLogs: logs
+      });
     }
 
-    if (ai) {
-      try {
-        const historyContext = session.messages.slice(-6, -1).map(m => `${m.sender.toUpperCase()}: ${m.text}`).join("\n");
-        const systemPrompt = `You are "Buddy", the brilliant, warm AI Tutor of the Accessible AI Study Buddy.
-        Your task is to provide supportive, high-contrast, screen-reader friendly instruction.
-        
-        Note Context to draw answers from:
-        Title: "${noteTitle}"
-        Notes content: "${noteContext.slice(0, 4000).replace(/"/g, '\\"')}"
-        
-        Pedagogical settings:
-        ${modeInstruction}
-        
-        Recent interaction logs:
-        ${historyContext}
-        
-        Instruction guidelines:
-        - Keep responses fully structured, using readable paragraphs.
-        - Underline definitions or list them cleanly.
-        - Be highly descriptive of concepts for students using read-aloud functionality.
-        - Encourage active recollection.`;
+    res.status(201).json(historyItem);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: userMessage,
-          config: {
-            systemInstruction: systemPrompt,
+// Get Quiz Scoring Records
+app.get("/api/quiz/history", authenticateToken, async (req: any, res) => {
+  try {
+    const list = await UnifiedDB.findQuizHistoryByUser(req.user.id);
+    res.json(list);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get Quiz Leaderboard Scores (Phase 2 & 13)
+app.get("/api/quiz/leaderboard", authenticateToken, async (req: any, res) => {
+  try {
+    const leaderboard = await UnifiedDB.getLeaderboard();
+    res.json(leaderboard.slice(0, 10)); // Top 10 users as demanded in instructions
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// -------------------------------------------------------------
+// ROUTES: CONTEXT-AWARE TUTOR COGNITIVE RAG SYSTEM (Phase 7)
+// -------------------------------------------------------------
+
+// Post message into AI Conversational Tutor thread with exact Cosine Vector RAG Retrieve
+app.post("/api/tutor/chat", authenticateToken, async (req: any, res) => {
+  const { noteId, userMessage, mode = "normal", chatSessionId } = req.body;
+  if (!userMessage) {
+    return res.status(400).json({ error: "Your chat query content is empty." });
+  }
+
+  try {
+    let noteTitle = "General Knowledge Helpdesk";
+    let retrievedContext = "General assistance instruction guidelines.";
+
+    // Process exact Cosine similarity matching if note context reference exists
+    if (noteId) {
+      const note = await UnifiedDB.findNoteById(noteId);
+      if (note && note.ragChunks && note.ragChunks.length > 0) {
+        noteTitle = note.title;
+
+        try {
+          if (AIService.isGeminiAvailable()) {
+            const queryEmbedding = await AIService.createEmbedding(userMessage);
+
+            // Compute cosine similarities to identify top relevant vectors (RAG)
+            const matches = note.ragChunks.map((chunk: any) => {
+              if (!chunk.embedding || chunk.embedding.length === 0) return { chunk, similarity: 0 };
+              
+              // Direct dot calculations
+              let dotProduct = 0;
+              let normA = 0;
+              let normB = 0;
+              for (let i = 0; i < queryEmbedding.length; i++) {
+                const elementB = chunk.embedding[i] || 0;
+                dotProduct += queryEmbedding[i] * elementB;
+                normA += queryEmbedding[i] * queryEmbedding[i];
+                normB += elementB * elementB;
+              }
+              const similarity = normA === 0 || normB === 0 ? 0 : dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+              return { chunk, similarity };
+            });
+
+            // Sort matches to find top 3 matches
+            matches.sort((a: any, b: any) => b.similarity - a.similarity);
+            const topPassages = matches.slice(0, 3).map((item: any) => item.chunk.text);
+            retrievedContext = topPassages.join(" \n\n ");
+          } else {
+            retrievedContext = note.rawContent.substring(0, 3000);
           }
-        });
-
-        aiResponseText = response.text || "I was unable to synthesize the content correctly.";
-      } catch (gemErr) {
-        console.error("Gemini failed during active tutoring: ", gemErr);
+        } catch (embeddingError) {
+          console.warn("Cosine search failed, fallback to raw passage:", embeddingError);
+          retrievedContext = note.rawContent.substring(0, 3500);
+        }
       }
     }
 
-    // Push AI response message
-    session.messages.push({
-      id: "msg_" + Math.random().toString(36).substring(2, 11),
-      sender: "ai",
-      text: aiResponseText,
-      timestamp: new Date().toISOString()
+    // Connect to Chat Session
+    const session = await UnifiedDB.findOrCreateChatSession(noteId, req.user.id, chatSessionId);
+
+    // Save User Voice transcription or query string
+    await UnifiedDB.pushChatMessage(session._id || session.id, req.user.id, {
+      sender: "user",
+      text: userMessage
     });
 
-    session.updatedAt = new Date().toISOString();
-    writeDB(db);
+    // Formulate final AI prompt
+    const chatHistoryStrings = session.messages.slice(-8).map((msg: any) => `${msg.sender}: ${msg.text}`);
+    const finalAnswer = await AIService.generateTutorChatResponse(
+      userMessage,
+      noteTitle,
+      retrievedContext,
+      mode,
+      chatHistoryStrings
+    );
 
-    res.json({ aiResponse: aiResponseText, session });
+    // Save final response in database
+    const updatedSession = await UnifiedDB.pushChatMessage(session._id || session.id, req.user.id, {
+      sender: "ai",
+      text: finalAnswer
+    });
+
+    res.json({ aiResponse: finalAnswer, session: updatedSession });
+  } catch (err: any) {
+    console.error("Tutoring flow failure: ", err);
+    if (err.message === "GEMINI_API_KEY_MISSING") {
+      res.status(403).json({ error: "GEMINI_API_KEY_MISSING" });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// Fetch Conversational Tutor Sessions list
+app.get("/api/tutor/sessions", authenticateToken, async (req: any, res) => {
+  try {
+    const list = await UnifiedDB.findChatSessionsByUser(req.user.id);
+    res.json(list);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Fetch tutoring chats
-app.get("/api/tutor/sessions", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const userSessions = db.chatSessions.filter((s) => s.userId === req.user.id);
-  res.json(userSessions);
-});
-
-// Fetch detailed session message thread
-app.get("/api/tutor/sessions/:id", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const session = db.chatSessions.find((s) => s.id === req.params.id && s.userId === req.user.id);
-  if (!session) {
-    return res.status(404).json({ error: "Session thread was not located." });
+// Fetch Conversational Session Messages
+app.get("/api/tutor/sessions/:id", authenticateToken, async (req: any, res) => {
+  try {
+    const session = await UnifiedDB.findOrCreateChatSession("", req.user.id, req.params.id);
+    if (!session) {
+      return res.status(404).json({ error: "Session thread not encountered." });
+    }
+    res.json(session);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
   }
-  res.json(session);
 });
 
 
-// ==========================================
-// ROUTES: IMAGE DESCRIPTION (ACCESSIBILITY)
-// ==========================================
+// -------------------------------------------------------------
+// ROUTES: IMAGE ANALYSIS HELPDESK (Phase 11)
+// -------------------------------------------------------------
 
-// Multimodal image captioning
+// Use Gemini Multimodal Vision to explain charts
 app.post("/api/image-caption", authenticateToken, async (req: any, res) => {
-  const { imageBase64, title } = req.body; // base64 string starting like data:image/png;base64,...
+  const { imageBase64, title } = req.body;
   if (!imageBase64) {
     return res.status(400).json({ error: "An image data payload is required." });
   }
 
-  // Extract base64 segment
   let cleanedBase64 = imageBase64;
-  let mimeType = "image/png";
+  let typeFormat = "image/png";
+
   if (imageBase64.includes(";base64,")) {
-    const parts = imageBase64.split(";base64,");
-    cleanedBase64 = parts[1];
-    mimeType = parts[0].replace("data:", "");
+    const splitArr = imageBase64.split(";base64,");
+    cleanedBase64 = splitArr[1];
+    typeFormat = splitArr[0].replace("data:", "");
   }
 
   try {
-    let captionText = "A high contrast illustration depicting classroom diagrams. Safe labels read 'A', 'B' and 'C'. Text at lower-margin reads study guidelines.";
-
-    if (ai) {
-      try {
-        const imagePart = {
-          inlineData: {
-            mimeType: mimeType,
-            data: cleanedBase64
-          }
-        };
-        const textPart = {
-          text: `You are an expert accessibility consultant and visual-to-audio study captioner.
-          Describe this study image (could be a snapshot of a lecture, a textbook page, a flowchart, mathematical formulas, or lecture slides) in rich text detail.
-          
-          Guidelines targeting visually impaired students:
-          - Detail exactly what is represented.
-          - Transcribe ALL reading texts, titles, formulas, numbers, or headers completely.
-          - Describe colors, shapes, charts, and structural hierarchy cleanly and logically.
-          - Use readable paragraphs. Keep the layout optimized for screen readers.`
-        };
-
-        const response = await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: { parts: [imagePart, textPart] }
-        });
-
-        captionText = response.text || "An image loaded onto the workspace.";
-      } catch (gemErr) {
-        console.error("Gemini failed during image description: ", gemErr);
-      }
-    }
-
-    const db = readDB();
-    const newReport: ImageCaptionReport = {
-      id: "caption_" + Math.random().toString(36).substring(2, 11),
+    const captionText = await AIService.analyzeImageForAccessibility(cleanedBase64, typeFormat);
+    const newReport = await UnifiedDB.createCaption({
       userId: req.user.id,
-      title: title || `Visual Helper Description ${new Date().toLocaleDateString()}`,
+      title: title || `Visual Outline description: ${new Date().toLocaleDateString()}`,
       description: captionText,
-      createdAt: new Date().toISOString()
-    };
-
-    db.captions.push(newReport);
-    writeDB(db);
+      imageUrl: imageBase64.startsWith("http") ? imageBase64 : "" // If already uploaded to Cloudinary, store URL
+    });
 
     res.status(201).json(newReport);
+  } catch (err: any) {
+    console.error("Visual helper processing failed:", err);
+    if (err.message === "GEMINI_API_KEY_MISSING") {
+      res.status(403).json({ error: "GEMINI_API_KEY_MISSING" });
+    } else {
+      res.status(500).json({ error: err.message });
+    }
+  }
+});
+
+// Get Captions Histories
+app.get("/api/image-caption", authenticateToken, async (req: any, res) => {
+  try {
+    const list = await UnifiedDB.findCaptionsByUser(req.user.id);
+    res.json(list);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Fetch all caption histories
-app.get("/api/image-caption", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const reports = db.captions.filter((c) => c.userId === req.user.id);
-  res.json(reports);
-});
 
+// -------------------------------------------------------------
+// ROUTES: WHISPER STT & ELEVENLABS TTS PROXIES (Phase 10)
+// -------------------------------------------------------------
 
-// ==========================================
-// ROUTES: OVERALL DASHBOARD ANALYTICS
-// ==========================================
-
-app.get("/api/analytics", authenticateToken, (req: any, res) => {
-  const db = readDB();
-  const userId = req.user.id;
-
-  const notesCount = db.notes.filter((n) => n.userId === userId).length;
-  const quizHistory = db.quizHistory.filter((h) => h.userId === userId);
-  const quizCount = quizHistory.length;
-
-  let averageScore = 0;
-  if (quizCount > 0) {
-    const totalPercentage = quizHistory.reduce((acc, curr) => acc + curr.percentage, 0);
-    averageScore = Math.round(totalPercentage / quizCount);
+// OpenAI Whisper STT Proxy
+app.post("/api/speech/stt", authenticateToken, async (req: any, res) => {
+  const { audioBase64 } = req.body;
+  if (!audioBase64) {
+    return res.status(400).json({ error: "audioBase64 parameter is required." });
   }
 
-  const user = db.users.find((u) => u.id === userId);
-  const studyHours = user?.studyHours || 0;
-  const studyLogs = user?.studyLogs || [{ date: new Date().toISOString().split("T")[0], minutes: 12 }];
+  const key = process.env.OPENAI_API_KEY;
+  if (!key) {
+    return res.status(400).json({ error: "OPENAI_API_KEY_MISSING" });
+  }
 
-  res.json({
-    notesCount,
-    quizCount,
-    averageScore,
-    studyHours,
-    studyLogs,
-    recentScores: quizHistory.slice(-5).map(h => ({ name: h.title.split(":")[0], score: h.percentage }))
-  });
+  try {
+    const buffer = Buffer.from(audioBase64, "base64");
+    const formData = new FormData();
+    const soundBlob = new Blob([buffer], { type: "audio/wav" });
+    
+    formData.append("file", soundBlob, "speech.wav");
+    formData.append("model", "whisper-1");
+
+    const resp = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${key}`
+      },
+      body: formData
+    });
+
+    if (!resp.ok) {
+      throw new Error(`OpenAI Whisper request failed: ${resp.statusText}`);
+    }
+
+    const json = await resp.json();
+    res.json({ text: json.text || "" });
+  } catch (err: any) {
+    console.error("STT transcription relay failed:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ElevenLabs TTS Proxy
+app.post("/api/speech/tts", authenticateToken, async (req: any, res) => {
+  const { text, voiceId = "21m0aTcmDWmsqK71tcGf" } = req.body; // Default of Rachel voice, highly melodic
+  if (!text) {
+    return res.status(400).json({ error: "Recitation text is required." });
+  }
+
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) {
+    return res.status(400).json({ error: "ELEVENLABS_API_KEY_MISSING" });
+  }
+
+  try {
+    const response = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "xi-api-key": key
+      },
+      body: JSON.stringify({
+        text,
+        model_id: "eleven_monolingual_v1",
+        voice_settings: {
+          stability: 0.75,
+          similarity_boost: 0.75
+        }
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`ElevenLabs speech conversion failed: ${response.statusText}`);
+    }
+
+    const soundBuffer = await response.arrayBuffer();
+    res.set("Content-Type", "audio/mpeg");
+    res.send(Buffer.from(soundBuffer));
+  } catch (err: any) {
+    console.error("ElevenLabs proxy error:", err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 
-// ==========================================
-// VITE CLIENT INTEGRATION
-// ==========================================
+// -------------------------------------------------------------
+// ROUTES: DETAILED COGNITIVE ANALYTICS REPORT (Phase 13)
+// -------------------------------------------------------------
 
-if (process.env.NODE_ENV !== "production") {
-  // Integrate Vite Dev Middleware in Development setup (running hot reload equivalent checks)
-  createViteServer({
-    server: { middlewareMode: true },
-    appType: "spa"
-  }).then((vite) => {
-    app.use(vite.middlewares);
-    console.log("Vite dev server middleware integrated successfully.");
-  });
-} else {
-  // Serve static assets in Production
-  const distPath = path.join(process.cwd(), "dist");
-  app.use(express.static(distPath));
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  });
-}
+app.get("/api/analytics", authenticateToken, async (req: any, res) => {
+  try {
+    const notes = await UnifiedDB.findNotesByUser(req.user.id);
+    const histories = await UnifiedDB.findQuizHistoryByUser(req.user.id);
+    const user = await UnifiedDB.findUserById(req.user.id);
 
-// Start Server binding to host '0.0.0.0' on hardcoded port 3000
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server starting happily on http://0.0.0.0:${PORT}`);
+    const notesCount = notes.length;
+    const quizCount = histories.length;
+
+    let averageScore = 0;
+    if (quizCount > 0) {
+      const sum = histories.reduce((acc, curr) => acc + curr.percentage, 0);
+      averageScore = Math.round(sum / quizCount);
+    }
+
+    // Compute Study Streak (consecutive active dates in studyLogs)
+    const logs = user?.studyLogs || [];
+    let consecutiveStreak = 0;
+    
+    if (logs.length > 0) {
+      const sortedDates = logs
+        .map((l: any) => l.date)
+        .filter((d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+        .sort((a: string, b: string) => new Date(b).getTime() - new Date(a).getTime()); // Descending
+
+      const uniqueDates = Array.from(new Set(sortedDates));
+      if (uniqueDates.length > 0) {
+        let currentStreak = 0;
+        let expectedDate = new Date(); // Start comparison with local today
+        expectedDate.setHours(12, 0, 0, 0);
+
+        for (let i = 0; i < uniqueDates.length; i++) {
+          const entryDate = new Date(String(uniqueDates[i]));
+          entryDate.setHours(12, 0, 0, 0);
+
+          const daysDiff = Math.round((expectedDate.getTime() - entryDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysDiff === 0 || (i === 0 && daysDiff === 1)) {
+            // First item could be yesterday or today, thereafter must be sequential with diff 1
+            currentStreak++;
+            expectedDate = entryDate;
+            expectedDate.setDate(expectedDate.getDate() - 1);
+          } else if (daysDiff === 1) {
+            currentStreak++;
+            expectedDate.setDate(expectedDate.getDate() - 1);
+          } else {
+            break;
+          }
+        }
+        consecutiveStreak = currentStreak;
+      }
+    }
+
+    // Compile recent accuracy trends
+    const recentScores = histories.slice(-6).map((h, i) => ({
+      name: `Quiz ${i + 1}`,
+      score: h.percentage,
+      accuracy: h.percentage
+    }));
+
+    // Formulate strength topics vs weakness topics
+    const strengths: string[] = [];
+    const weaknesses: string[] = [];
+
+    histories.forEach((h) => {
+      const name = h.title.split(":").slice(-1)[0] || "General";
+      if (h.percentage >= 75) {
+        if (!strengths.includes(name)) strengths.push(name);
+      } else {
+        if (!weaknesses.includes(name)) weaknesses.push(name);
+      }
+    });
+
+    if (strengths.length === 0) strengths.push("Retrieval Recall Practice");
+    if (weaknesses.length === 0) weaknesses.push("Focus Endurance Exercises");
+
+    res.json({
+      notesCount,
+      quizCount,
+      averageScore,
+      studyHours: Math.round((user?.studyHours || 0) * 10) / 10,
+      studyLogs: logs.slice(-7), // Last 7 days
+      consecutiveStreak,
+      recentScores,
+      strengths: strengths.slice(0, 3),
+      weaknesses: weaknesses.slice(0, 3)
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+// -------------------------------------------------------------
+// VITE CLIENT INTEGRATION & INGRESS ROUTING
+// -------------------------------------------------------------
+
+UnifiedDB.init().then((success) => {
+  if (success) {
+    console.info("⚡ Success: Relational MongoDB collection cluster online.");
+  } else {
+    console.info("⚠️ warning: Local high-density fallback activated.");
+  }
+
+  if (process.env.NODE_ENV !== "production") {
+    createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa"
+    }).then((vite) => {
+      app.use(vite.middlewares);
+      console.log("⚡ Vite development middleware bound to port 3000.");
+    });
+  } else {
+    const distPath = path.join(process.cwd(), "dist");
+    app.use(express.static(distPath));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(distPath, "index.html"));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Production server launched in ingress container at http://0.0.0.0:${PORT}`);
+  });
+}).catch((err) => {
+  console.error("FATAL: Database engine initialization failed:", err);
+  process.exit(1);
 });

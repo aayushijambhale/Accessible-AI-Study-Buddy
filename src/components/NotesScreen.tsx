@@ -46,7 +46,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     size: string;
     text: string;
     pagesCount: number;
-    outline: string[];
+    pages: string[];
     currentPage: number;
   } | null>(null);
 
@@ -138,81 +138,124 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     return () => window.removeEventListener("trigger-voice-create-notes", handleVoiceCreateNotes);
   }, [token, voicePref]);
 
-  // Extract printable text out of uncompressed stream structures (or provide high-context academic text fallback)
-  const extractPdfContent = (file: File, arrayBuffer: ArrayBuffer) => {
+  // Real PDF extraction with multi-page pdfjs-dist layers & Tesseract OCR analytics fallback (Phase 1 & 2)
+  const extractPdfContent = async (file: File, arrayBuffer: ArrayBuffer) => {
+    setIsUploadingFile(true);
+    setError("");
+    setProgressStatus("Extracting document bytes...");
+    setGenerateProgress(10);
+    
     try {
-      const view = new Uint8Array(arrayBuffer);
-      let out = "";
-      
-      // Simple stream decoder
-      for (let i = 0; i < Math.min(view.length, 60000); i++) {
-        const char = view[i];
-        if ((char >= 32 && char <= 126) || char === 10 || char === 13) {
-          out += String.fromCharCode(char);
-        } else {
-          out += " ";
-        }
-      }
-
-      // Look for PDF string markers Tj or brackets
-      const tjRegex = /\(([^)]+)\)\s*Tj/g;
-      let matches: string[] = [];
-      let match;
-      while ((match = tjRegex.exec(out)) !== null && matches.length < 300) {
-        if (match[1].trim().length > 3) {
-          matches.push(match[1]);
-        }
-      }
-
-      let parsedText = "";
-      if (matches.length > 10) {
-        parsedText = matches.join(" ");
-      } else {
-        // Fallback text format scanner
-        parsedText = out.replace(/\s+/g, " ").trim().substring(0, 5000);
-      }
-
-      // If text is highly encoded/binary gibberish, overlay a professional textbook context fallback matching title
       const cleanName = file.name.replace(/\.[^/.]+$/, "");
       const finalTitleInput = cleanName.charAt(0).toUpperCase() + cleanName.slice(1);
-      
-      let finalExtractedText = parsedText;
-      if (finalExtractedText.length < 50 || !/[a-zA-Z]{4,}/.test(finalExtractedText)) {
-        finalExtractedText = `Subject: ${finalTitleInput}\n\nOverview of core academic concepts relating to ${finalTitleInput}.\nKey theories outline that processes follow structural paradigms. In practice, they require meticulous analysis. Specifically, we focus on identifying primary mechanisms, historical context, and practical methodologies used to measure results. Exam evaluations will challenge students to explain these principles under general terms and relate them to real-world analogies.`;
+      setTitle(finalTitleInput);
+
+      // Check if it is a simple plain text note
+      if (file.name.endsWith(".txt")) {
+        const textDecoder = new TextDecoder("utf-8");
+        const parsedText = textDecoder.decode(arrayBuffer);
+        setUploadedPdf({
+          name: file.name,
+          size: (file.size / 1024).toFixed(1) + " KB",
+          text: parsedText,
+          pagesCount: 1,
+          pages: [parsedText],
+          currentPage: 1
+        });
+        setContent(parsedText);
+        SpeechEngine.speak("Plaintext notebook guidelines parsed safely.", voicePref);
+        setIsUploadingFile(false);
+        return;
       }
 
-      // Structure pages for the mockup visualization
-      const textLength = finalExtractedText.length;
-      const partSize = Math.ceil(textLength / 4);
-      const generatedPages = [
-        finalExtractedText.substring(0, partSize) || "Chapter Outline: Course Abstract introductory notes.",
-        finalExtractedText.substring(partSize, partSize * 2) || "Key Theoretical Foundations: Hypotheses and physical mechanics.",
-        finalExtractedText.substring(partSize * 2, partSize * 3) || "Practical Applications: Real-world metaphors & laboratory experiments.",
-        finalExtractedText.substring(partSize * 3) || "Detailed Cheat Sheet: Formulas, key takeaways for review."
-      ];
+      // Read real layers via window.pdfjsLib (Phase 1)
+      const pdfjs = (window as any).pdfjsLib;
+      if (!pdfjs) {
+        throw new Error("PDF processing engine is offline. Please check network hooks.");
+      }
+
+      const uint8 = new Uint8Array(arrayBuffer);
+      const loadingTask = pdfjs.getDocument({ data: uint8 });
+      const pdf = await loadingTask.promise;
+      const numPages = pdf.numPages;
+      let fullText = "";
+      const pdfPagesTextList: string[] = [];
+
+      setProgressStatus("Scanning PDF text characters...");
+      setGenerateProgress(30);
+
+      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
+        const page = await pdf.getPage(pageNum);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
+        pdfPagesTextList.push(pageText);
+        fullText += pageText + "\n";
+      }
+
+      // Check if document requires Tesseract.js OCR (Scanned / Image PDF detection)
+      let isOcrTriggered = false;
+      const tesseractInstance = (window as any).Tesseract;
+      if (fullText.trim().length < 50 && tesseractInstance) {
+        isOcrTriggered = true;
+        setProgressStatus("OCR fallback triggered: Digitizing scanned layouts...");
+        setGenerateProgress(50);
+        
+        let ocrFullText = "";
+        const ocrPagesTextList: string[] = [];
+
+        // Scan first 3 pages of scanned files to keep visual performance responsive
+        for (let pageNum = 1; pageNum <= Math.min(numPages, 3); pageNum++) {
+          setProgressStatus(`Digitizing page layout index ${pageNum}...`);
+          try {
+            const page = await pdf.getPage(pageNum);
+            const viewport = page.getViewport({ scale: 1.5 });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d");
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+
+            if (context) {
+              await page.render({ canvasContext: context, viewport }).promise;
+              const result = await tesseractInstance.recognize(canvas, "eng");
+              const ocrText = result.data.text || "";
+              ocrPagesTextList.push(ocrText);
+              ocrFullText += ocrText + "\n";
+            }
+          } catch (ocrErr) {
+            console.error(`OCR analysis failed on page ${pageNum}:`, ocrErr);
+          }
+        }
+        
+        if (ocrFullText.trim().length > 10) {
+          fullText = ocrFullText;
+          pdfPagesTextList.splice(0, pdfPagesTextList.length, ...ocrPagesTextList);
+        }
+      }
+
+      if (fullText.trim().length < 10) {
+        throw new Error("No readable text nodes located in academic file.");
+      }
 
       setUploadedPdf({
         name: file.name,
         size: (file.size / 1024).toFixed(1) + " KB",
-        text: finalExtractedText,
-        pagesCount: 4,
-        outline: [
-          "1. Course Lecture Abstract",
-          "2. Theoretical Framework",
-          "3. Sandbox Environments Case Study",
-          "4. Examination Preparation Guide"
-        ],
+        text: fullText,
+        pagesCount: pdfPagesTextList.length,
+        pages: pdfPagesTextList,
         currentPage: 1
       });
 
-      // Populate input states
-      setTitle(finalTitleInput);
-      setContent(finalExtractedText);
-      SpeechEngine.speak(`PDF loaded. Drag and Drop parsed textbook outline successfully.`, voicePref);
+      setContent(fullText);
+      setGenerateProgress(100);
+      setProgressStatus(isOcrTriggered ? "Scanned OCR digitizer success!" : "PDF characters extracted successfully!");
+      SpeechEngine.speak(isOcrTriggered ? "Scanned document digitized via OCR." : "PDF text layer extracted.", voicePref);
 
-    } catch (err) {
-      console.error("PDF array structure reading error", err);
-      setError("Unable to decrypt PDF structures natively, loaded fallback template.");
+    } catch (err: any) {
+      console.error("PDF engine failure:", err);
+      setError(`Extraction failed: ${err.message}`);
+      SpeechEngine.speak(`Error: ${err.message}`, voicePref);
+    } finally {
+      setIsUploadingFile(false);
     }
   };
 
@@ -221,14 +264,13 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     setError("");
 
     const reader = new FileReader();
-    reader.onload = (event) => {
+    reader.onload = async (event) => {
       const buffer = event.target?.result as ArrayBuffer;
-      extractPdfContent(file, buffer);
-      setIsUploadingFile(false);
+      await extractPdfContent(file, buffer);
     };
 
     reader.onerror = () => {
-      setError("File reader failed to open files.");
+      setError("File reader failed to read standard bytes.");
       setIsUploadingFile(false);
     };
 
@@ -587,84 +629,46 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     className="space-y-3 p-1 font-sans text-xs leading-relaxed text-[#134E4A]/95"
                     style={{ fontSize: `${pdfZoom}%` }}
                   >
-                    {/* Dynamic Textbook visual columns simulate pages based on uploadedPdf */}
+                    {/* Dynamic Textbook visual columns render pages based on uploadedPdf */}
                     <div className="border-b border-[#0F766E]/10 pb-1 mb-2 flex justify-between items-center text-[10px] font-mono text-[#0F766E]/70 uppercase tracking-widest font-bold">
                       <span>TEXTBOOK PREVIEW CHAPTER</span>
                       <span>PAGE {uploadedPdf.currentPage} OF {uploadedPdf.pagesCount}</span>
                     </div>
 
-                    {/* Simulating 4 rich chapters mapped automatically */}
-                    {uploadedPdf.currentPage === 1 && (
-                      <div className="space-y-2">
-                        <h4 className="font-extrabold text-[13px] text-[#0F766E]">Abstract Summary Foundations</h4>
-                        <p 
-                          onClick={() => toggleTextHighlight("The academic scope encompasses processes designed to map physical parameters to quantitative measures. By constructing a secure relational blueprint, students can track performance markers effortlessly.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[1] || []).includes("The academic scope encompasses processes designed to map physical parameters to quantitative measures. By constructing a secure relational blueprint, students can track performance markers effortlessly.") ? "bg-yellow-100" : ""}`}
-                        >
-                          The academic scope encompasses processes designed to map physical parameters to quantitative measures. By constructing a secure relational blueprint, students can track performance markers effortlessly.
-                        </p>
-                        <p 
-                          onClick={() => toggleTextHighlight("We implement active study workspaces to bridge the gap between lecture slides and final tests. The platform maintains automatic audio descriptions for readers.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[1] || []).includes("We implement active study workspaces to bridge the gap between lecture slides and final tests. The platform maintains automatic audio descriptions for readers.") ? "bg-yellow-100" : ""}`}
-                        >
-                          We implement active study workspaces to bridge the gap between lecture slides and final tests. The platform maintains automatic audio descriptions for readers.
-                        </p>
-                      </div>
-                    )}
+                    <div className="space-y-2">
+                      {(() => {
+                        const pageText = uploadedPdf.pages?.[uploadedPdf.currentPage - 1] || uploadedPdf.text || "";
+                        // Split page text into sentences/paragraphs dynamically for highlighting
+                        const sentences = pageText.match(/[^.!?]+[.!?]+(\s+|$)/g) || [pageText];
+                        
+                        const paragraphsList: string[] = [];
+                        for (let i = 0; i < sentences.length; i += 2) {
+                          const combo = (sentences[i] || "") + (sentences[i+1] || "");
+                          if (combo.trim()) {
+                            paragraphsList.push(combo.trim());
+                          }
+                        }
 
-                    {uploadedPdf.currentPage === 2 && (
-                      <div className="space-y-2">
-                        <h4 className="font-extrabold text-[13px] text-emerald-800">Theoretical Foundations & Models</h4>
-                        <p 
-                          onClick={() => toggleTextHighlight("In model formulations, we encounter specific variables that define the kinetics of the system. For instance, the transition coefficients indicate latency offsets.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[2] || []).includes("In model formulations, we encounter specific variables that define the kinetics of the system. For instance, the transition coefficients indicate latency offsets.") ? "bg-emerald-100" : ""}`}
-                        >
-                          In model formulations, we encounter specific variables that define the kinetics of the system. For instance, the transition coefficients indicate latency offsets.
-                        </p>
-                        <p 
-                          onClick={() => toggleTextHighlight("Furthermore, empirical test trials demonstrate that students who review both literal lists and simplified metaphors retain facts at a sixty percent higher benchmark.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[2] || []).includes("Furthermore, empirical test trials demonstrate that students who review both literal lists and simplified metaphors retain facts at a sixty percent higher benchmark.") ? "bg-emerald-100" : ""}`}
-                        >
-                          Furthermore, empirical test trials demonstrate that students who review both literal lists and simplified metaphors retain facts at a sixty percent higher benchmark.
-                        </p>
-                      </div>
-                    )}
+                        if (paragraphsList.length === 0) {
+                          return <p className="text-gray-400 italic">No readable character nodes on this page.</p>;
+                        }
 
-                    {uploadedPdf.currentPage === 3 && (
-                      <div className="space-y-2">
-                        <h4 className="font-extrabold text-[13px] text-cyan-800">Practical Sandbox Applications</h4>
-                        <p 
-                          onClick={() => toggleTextHighlight("A helpful metaphor compares this relational mapping mechanism to a physical library catalog. Rather than reading every shelf random-access format, index registries direct readers directly.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[3] || []).includes("A helpful metaphor compares this relational mapping mechanism to a physical library catalog. Rather than reading every shelf random-access format, index registries direct readers directly.") ? "bg-pink-100" : ""}`}
-                        >
-                          A helpful metaphor compares this relational mapping mechanism to a physical library catalog. Rather than reading every shelf random-access format, index registries direct readers directly.
-                        </p>
-                        <p 
-                          onClick={() => toggleTextHighlight("This layout represents Sandbox implementations designed to allow students to construct evaluations, complete summaries, and chat with AI tutors in single-screen comfort.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[3] || []).includes("This layout represents Sandbox implementations designed to allow students to construct evaluations, complete summaries, and chat with AI tutors in single-screen comfort.") ? "bg-pink-100" : ""}`}
-                        >
-                          This layout represents Sandbox implementations designed to allow students to construct evaluations, complete summaries, and chat with AI tutors in single-screen comfort.
-                        </p>
-                      </div>
-                    )}
-
-                    {uploadedPdf.currentPage === 4 && (
-                      <div className="space-y-2">
-                        <h4 className="font-extrabold text-[13px] text-amber-800">Examination Cheat Sheet Core Key Cues</h4>
-                        <p 
-                          onClick={() => toggleTextHighlight("Formulas to memorize: Ratio scale equals primary performance counts divided by total question pools.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[4] || []).includes("Formulas to memorize: Ratio scale equals primary performance counts divided by total question pools.") ? "bg-yellow-100" : ""}`}
-                        >
-                          Formulas to memorize: Ratio scale equals primary performance counts divided by total question pools.
-                        </p>
-                        <p 
-                          onClick={() => toggleTextHighlight("Important highlight concepts: Always prioritize active feedback loops. Submit correct responses instantly to verify logical fallacies.")}
-                          className={`cursor-pointer select-none rounded p-1 transition-all hover:bg-gray-200/50 ${(highlights[4] || []).includes("Important highlight concepts: Always prioritize active feedback loops. Submit correct responses instantly to verify logical fallacies.") ? "bg-yellow-100" : ""}`}
-                        >
-                          Important highlight concepts: Always prioritize active feedback loops. Submit correct responses instantly to verify logical fallacies.
-                        </p>
-                      </div>
-                    )}
+                        return paragraphsList.map((paraVal, idx) => {
+                          const isHighlighted = (highlights[uploadedPdf.currentPage] || []).includes(paraVal);
+                          return (
+                            <p
+                              key={idx}
+                              onClick={() => toggleTextHighlight(paraVal)}
+                              className={`cursor-pointer select-none rounded p-1.5 transition-all text-justify hover:bg-[#0F766E]/5 ${
+                                isHighlighted ? "bg-yellow-200/90 shadow-2xs border border-yellow-300" : ""
+                              }`}
+                            >
+                              {paraVal}
+                            </p>
+                          );
+                        });
+                      })()}
+                    </div>
 
                   </div>
                 ) : (
