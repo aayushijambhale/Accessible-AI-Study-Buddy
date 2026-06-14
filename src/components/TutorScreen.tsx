@@ -174,18 +174,18 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
       <div className="lg:col-span-4 space-y-6 flex flex-col justify-start">
         
         {/* Context Picker */}
-        <div className="bg-white p-6 rounded-2xl border border-[#0F766E]/10 space-y-4">
-          <div className="flex items-center gap-2 text-[#0F766E]">
+        <div className="bg-white p-6 rounded-2xl border border-[#4338CA]/10 space-y-4">
+          <div className="flex items-center gap-2 text-[#4338CA]">
             <Sparkles className="w-5 h-5" />
-            <h3 className="text-md font-bold text-[#134E4A]">Tutoring Context</h3>
+            <h3 className="text-md font-bold text-[#312E81]">Tutoring Context</h3>
           </div>
 
-          <p className="text-xs text-[#134E4A]/70 leading-relaxed font-semibold">
+          <p className="text-xs text-[#312E81]/70 leading-relaxed font-semibold">
             Point or attach your Study Buddy chatbot to an uploaded lesson note. Buddy will read notes to answer queries accurately. If none selected, Buddy utilizes scientific general education databases.
           </p>
 
           <div>
-            <label htmlFor="tutor-select-note" className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-1">
+            <label htmlFor="tutor-select-note" className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-1">
               Active Context Study Note
             </label>
             <select
@@ -195,7 +195,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
                 setSelectedNoteId(e.target.value);
                 SpeechEngine.speak(`Switched tutor context to note.`, voicePref);
               }}
-              className="w-full px-3 py-2 text-xs bg-[#FFFBF5] border border-[#0F766E]/15 rounded-xl block text-[#134E4A] focus:outline-none"
+              className="w-full px-3 py-2 text-xs bg-[#F8FAFC] border border-[#4338CA]/15 rounded-xl block text-[#312E81] focus:outline-none"
             >
               <option value="">No note chosen (General knowledge mode)</option>
               {notes.map((n) => (
@@ -208,8 +208,8 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
         </div>
 
         {/* Pedagogical mode selection boxes (Phase 6 requirements) */}
-        <div className="bg-white p-6 rounded-2xl border border-[#0F766E]/10 space-y-4 shadow-xs">
-          <span className="text-xs font-bold text-[#134E4A]/60 block uppercase">Pedagogical Buddy Mode</span>
+        <div className="bg-white p-6 rounded-2xl border border-[#4338CA]/10 space-y-4 shadow-xs">
+          <span className="text-xs font-bold text-[#312E81]/60 block uppercase">Pedagogical Buddy Mode</span>
           
           <div className="grid grid-cols-1 gap-2.5">
             
@@ -222,8 +222,8 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               }}
               className={`p-3 text-left border rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 mode === "normal"
-                  ? "bg-[#0F766E] text-white border-[#0F766E]"
-                  : "bg-[#FFFBF5] border-[#0F766E]/10 hover:bg-[#14B8A6]/5 text-[#134E4A]"
+                  ? "bg-[#4338CA] text-white border-[#4338CA]"
+                  : "bg-[#F8FAFC] border-[#4338CA]/10 hover:bg-[#6366F1]/5 text-[#312E81]"
               }`}
             >
               🎓 Standard Academic Mode
@@ -238,8 +238,8 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               }}
               className={`p-3 text-left border rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 mode === "easy"
-                  ? "bg-[#14B8A6] text-white border-[#14B8A6] shadow-xs"
-                  : "bg-[#FFFBF5] border-[#0F766E]/10 hover:bg-[#14B8A6]/5 text-[#134E4A]"
+                  ? "bg-[#6366F1] text-white border-[#6366F1] shadow-xs"
+                  : "bg-[#F8FAFC] border-[#4338CA]/10 hover:bg-[#6366F1]/5 text-[#312E81]"
               }`}
             >
               💡 Easy Explanation Mode (Analogy Metaphors)
@@ -255,7 +255,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               className={`p-3 text-left border rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 mode === "exam_prep"
                   ? "bg-amber-600 text-white border-amber-600 shadow-xs"
-                  : "bg-[#FFFBF5] border-[#0F766E]/10 hover:bg-[#14B8A6]/5 text-[#134E4A]"
+                  : "bg-[#F8FAFC] border-[#4338CA]/10 hover:bg-[#6366F1]/5 text-[#312E81]"
               }`}
             >
               📝 Exam Prep Mode (Testing Terms)
@@ -267,17 +267,17 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
       </div>
 
       {/* RIGHT COLUMN: Chat box window panel */}
-      <div className="lg:col-span-8 bg-white rounded-3xl border border-[#0F766E]/10 flex flex-col justify-between overflow-hidden shadow-xs h-full">
+      <div className="lg:col-span-8 bg-white rounded-3xl border border-[#4338CA]/10 flex flex-col justify-between overflow-hidden shadow-xs h-full">
         
         {/* Chat Header */}
-        <div className="p-4 bg-[#FFFBF5] border-b border-[#0F766E]/10 flex items-center justify-between shrink-0">
+        <div className="p-4 bg-[#F8FAFC] border-b border-[#4338CA]/10 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#0F766E]/10 rounded-full text-[#0F766E]">
+            <div className="p-2 bg-[#4338CA]/10 rounded-full text-[#4338CA]">
               <MessageCircle className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <span className="text-[10px] font-bold text-[#14B8A6] uppercase block">Interactive Classroom</span>
-              <h4 className="text-sm font-bold text-[#134E4A]">Active Chat Session</h4>
+              <span className="text-[10px] font-bold text-[#6366F1] uppercase block">Interactive Classroom</span>
+              <h4 className="text-sm font-bold text-[#312E81]">Active Chat Session</h4>
             </div>
           </div>
 
@@ -286,7 +286,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               id="tutor-btn-stop-audio"
               onClick={() => SpeechEngine.stop()}
               title="Silence Tutor Audio"
-              className="p-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer"
+              className="p-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <StopCircle className="w-4 h-4" />
             </button>
@@ -302,15 +302,15 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
                 <div key={m.id} className={`flex ${isAi ? "justify-start" : "justify-end"} items-start gap-3`}>
                   
                   {isAi && (
-                    <div className="p-1.5 bg-[#0F766E]/10 rounded-full shrink-0">
-                      <Sparkles className="w-4 h-4 text-[#0F766E]" />
+                    <div className="p-1.5 bg-[#4338CA]/10 rounded-full shrink-0">
+                      <Sparkles className="w-4 h-4 text-[#4338CA]" />
                     </div>
                   )}
 
                   <div className={`max-w-lg p-4 rounded-2xl relative ${
                     isAi
-                      ? "bg-[#FFFBF5] border border-[#0F766E]/10 rounded-tl-none text-[#134E4A]"
-                      : "bg-[#0F766E] text-white rounded-tr-none font-medium"
+                      ? "bg-[#F8FAFC] border border-[#4338CA]/10 rounded-tl-none text-[#312E81]"
+                      : "bg-[#4338CA] text-white rounded-tr-none font-medium"
                   }`}>
                     
                     <p className="text-xs leading-relaxed break-words">{m.text}</p>
@@ -321,7 +321,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
                         id={`tutor-msg-speak-${m.id}`}
                         onClick={() => handleReadResponse(m.text)}
                         title="Read aloud"
-                        className="mt-2.5 p-1 text-[#0F766E] hover:text-[#134E4A] hover:bg-teal-50 rounded-sm cursor-pointer flex items-center gap-1 text-[10px] font-bold"
+                        className="mt-2.5 p-1 text-[#4338CA] hover:text-[#312E81] hover:bg-indigo-50 rounded-sm cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-1 text-[10px] font-bold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                       >
                         <Volume2 className="w-3.5 h-3.5" /> Read Aloud
                       </button>
@@ -333,10 +333,10 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               );
             })
           ) : (
-            <div className="h-full flex flex-col justify-center items-center text-center p-8 text-[#134E4A]/50">
-              <Sparkles className="w-12 h-12 text-[#134E4A]/15 mb-3" />
+            <div className="h-full flex flex-col justify-center items-center text-center p-8 text-[#312E81]/50">
+              <Sparkles className="w-12 h-12 text-[#312E81]/15 mb-3" />
               <h4 className="text-sm font-bold">Ask anything about your Lesson note</h4>
-              <p className="text-xs text-[#134E4A]/70 max-w-xs mt-1">
+              <p className="text-xs text-[#312E81]/70 max-w-xs mt-1">
                 Say "What is the key takeaway?", "Explain formulas using metaphors", or ask about any definitions.
               </p>
             </div>
@@ -344,7 +344,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
         </div>
 
         {/* Chat input form */}
-        <div className="p-4 bg-[#FFFBF5] border-t border-[#0F766E]/10 shrink-0 space-y-2">
+        <div className="p-4 bg-[#F8FAFC] border-t border-[#4338CA]/10 shrink-0 space-y-2">
           
           {recordingError && (
             <div className="p-2 text-[10px] text-red-800 bg-red-50 border border-red-200 rounded-lg flex items-center gap-1.5">
@@ -362,8 +362,8 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               title={isRecording ? "Stop voice capture" : "Record your question verbally"}
               className={`p-3.5 rounded-xl border transition-all cursor-pointer shrink-0 ${
                 isRecording
-                  ? "bg-[#14B8A6] border-[#14B8A6] text-white animate-pulse"
-                  : "bg-white border-gray-200 text-[#0F766E] hover:bg-[#14B8A6]/10"
+                  ? "bg-[#6366F1] border-[#6366F1] text-white animate-pulse"
+                  : "bg-white border-gray-200 text-[#4338CA] hover:bg-[#6366F1]/10"
               }`}
             >
               {isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
@@ -379,7 +379,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !sendingMessage) handleSendMessage();
               }}
-              className="flex-1 px-4 py-2 text-xs bg-white border border-gray-200 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
+              className="flex-1 px-4 py-2 text-xs bg-white border border-gray-200 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81]"
             />
 
             {/* Send content */}
@@ -387,7 +387,7 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
               id="tutor-btn-send"
               disabled={sendingMessage || !inputVal.trim()}
               onClick={() => handleSendMessage()}
-              className="p-3.5 bg-[#0F766E] text-white rounded-xl shadow-xs hover:bg-[#134E4A] disabled:opacity-50 transition-all cursor-pointer shrink-0"
+              className="p-3.5 bg-[#4338CA] text-white rounded-xl shadow-xs hover:bg-[#312E81] disabled:opacity-50 transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <Send className="w-4 h-4" />
             </button>

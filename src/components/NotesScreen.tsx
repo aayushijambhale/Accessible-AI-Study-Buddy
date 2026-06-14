@@ -65,8 +65,8 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   const [highlights, setHighlights] = useState<Record<number, string[]>>({}); // pageIndex: Array of text segments
   const [pdfViewMode, setPdfViewMode] = useState<"visual" | "raw">("visual");
 
-  // Note detail tab: "summary" | "bullets" | "exam" | "easy" | "definitions"
-  const [detailTab, setDetailTab] = useState<"summary" | "bullets" | "exam" | "easy" | "definitions">("summary");
+  // Note detail tab: "summary" | "concepts" | "exam" | "revision" | "faq"
+  const [detailTab, setDetailTab] = useState<"summary" | "concepts" | "exam" | "revision" | "faq">("summary");
 
   // Interactive note items mastery checklist state (Phase 4 interactivity additions)
   const [masteredBullets, setMasteredBullets] = useState<Record<string, boolean>>({});
@@ -296,31 +296,86 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     }
   };
 
-  const startNotesGeneration = async (targetTitle: string, targetContent: string) => {
+  const startNotesGeneration = async (targetTitle: string, targetContent: string, fileData?: File) => {
     setError("");
     setLoadingGenerate(true);
     setGenerateProgress(10);
-    setProgressStatus("Scanning file stream...");
-
-    const progressMilestones = [
-      { p: 25, label: "Scanning file stream..." },
-      { p: 50, label: "Extracting textbook layout & PDF vectors..." },
-      { p: 75, label: "Converting chapters under Easy-Explanation schemas..." },
-      { p: 90, label: "Summarizing with pedagogical standards..." }
-    ];
-
-    let milestoneIdx = 0;
-    const interval = setInterval(() => {
-      if (milestoneIdx < progressMilestones.length) {
-        setGenerateProgress(progressMilestones[milestoneIdx].p);
-        setProgressStatus(progressMilestones[milestoneIdx].label);
-        milestoneIdx++;
-      } else {
-        clearInterval(interval);
-      }
-    }, 600);
+    setProgressStatus("Connecting to pipeline...");
 
     try {
+      // Setup FormData
+      const formData = new FormData();
+      formData.append("title", targetTitle);
+      if (fileData) {
+        formData.append("file", fileData);
+      } else {
+        formData.append("content", targetContent);
+      }
+
+      // Fetch with SSE wrapper
+      const response = await fetch("/api/notes/generate-advanced", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error("Pipeline connection failed.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let done = false;
+      let finalNote = null;
+
+      while (!done) {
+        const { value, done: readerDone } = await reader.read();
+        done = readerDone;
+        if (value) {
+          const chunk = decoder.decode(value);
+          const lines = chunk.split("\n");
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].startsWith("event: ")) {
+              const eventType = lines[i].substring(7);
+              const dataLine = lines[i+1]?.substring(6);
+              if (dataLine) {
+                try {
+                  const payload = JSON.parse(dataLine);
+                  if (eventType === "progress") {
+                    setGenerateProgress(payload.progress);
+                    setProgressStatus(payload.stage);
+                  } else if (eventType === "complete") {
+                    finalNote = payload.note;
+                  } else if (eventType === "error") {
+                    throw new Error(payload.message);
+                  }
+                } catch(e) {}
+              }
+            }
+          }
+        }
+      }
+
+      if (finalNote) {
+        setTimeout(() => {
+          SpeechEngine.speak(`Notes generated successfully. ${finalNote.title} ready for study review.`, voicePref);
+          setTitle("");
+          setContent("");
+          setUploadedPdf(null);
+          setActiveNote(finalNote);
+          fetchNotes();
+          setLoadingGenerate(false);
+          setGenerateProgress(0);
+
+          window.dispatchEvent(new CustomEvent("voice-create-notes-completed", { detail: { note: finalNote } }));
+        }, 500);
+      } else {
+        throw new Error("Pipeline did not return final structure.");
+      }
+
+    } catch (err: any) {
       const res = await fetch("/api/notes/generate", {
         method: "POST",
         headers: {
@@ -329,35 +384,6 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
         },
         body: JSON.stringify({ title: targetTitle, content: targetContent }),
       });
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Material parsing failed on backend.");
-      }
-
-      clearInterval(interval);
-      setGenerateProgress(100);
-      setProgressStatus("Workspace created successfully!");
-
-      setTimeout(() => {
-        SpeechEngine.speak(`Notes generated successfully. ${data.title} ready for study review.`, voicePref);
-        setTitle("");
-        setContent("");
-        setUploadedPdf(null);
-        setActiveNote(data);
-        fetchNotes();
-        setLoadingGenerate(false);
-        setGenerateProgress(0);
-
-        // Dispatch completed event to let any waiting quiz generation triggers run!
-        window.dispatchEvent(new CustomEvent("voice-create-notes-completed", { detail: { note: data } }));
-      }, 500);
-
-    } catch (err: any) {
-      clearInterval(interval);
-      setError(err.message || "Failed notes compilation.");
-      SpeechEngine.speak(`Error: ${err.message}`, voicePref);
-      setLoadingGenerate(false);
       setGenerateProgress(0);
     }
   };
@@ -365,7 +391,11 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   // Submit parsed note block to database
   const handleGenerateNotes = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !content) return;
+    if (!title) return;
+    
+    // We can extract the file directly from an input or use the uploadedPdf state
+    // But since the actual file object is lost in uploadedPdf, we will just pass the extracted text.
+    // If the user pastes text, we pass that.
     await startNotesGeneration(title, content);
   };
 
@@ -413,39 +443,44 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     SpeechEngine.speak(textToRead, voicePref);
   };
 
-  // Export File format
-  const handleDownloadTxt = () => {
+  // Export DOCX File format
+  const handleDownloadDocx = async () => {
     if (!activeNote) return;
 
-    const fileText = `
-=========================================
-ACCESSIBLE STUDY BUDDY UNIT LESSON
-Title: ${activeNote.title}
-=========================================
+    try {
+      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
 
-1. SUMMARY OVERVIEW:
-${activeNote.summary}
+      const doc = new Document({
+        sections: [
+          {
+            properties: {},
+            children: [
+              new Paragraph({ text: activeNote.title, heading: HeadingLevel.HEADING_1 }),
+              new Paragraph({ text: "SUMMARY", heading: HeadingLevel.HEADING_2 }),
+              new Paragraph({ text: activeNote.summary || "" }),
+              new Paragraph({ text: "IMPORTANT NOTES", heading: HeadingLevel.HEADING_2 }),
+              ...(activeNote.important_notes || activeNote.bulletPoints || []).map(b => new Paragraph({ text: `• ${b}` })),
+              new Paragraph({ text: "KEY CONCEPTS", heading: HeadingLevel.HEADING_2 }),
+              ...(activeNote.key_concepts || []).map(c => new Paragraph({ children: [new TextRun({ text: `${c.concept}: `, bold: true }), new TextRun({ text: c.explanation })] })),
+            ],
+          },
+        ],
+      });
 
-2. DETAILED EXAM CHEAT NOTES:
-${activeNote.examNotes}
+      const blob = await Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `${activeNote.title.replace(/\s+/g, "_")}_lesson.docx`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
 
-3. SIMPLIFIED ANALOGY:
-${activeNote.easyExplanation}
-
-4. INCLUDED DEFINITIONS:
-${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n")}
-    `;
-
-    const blob = new Blob([fileText], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `${activeNote.title.replace(/\s+/g, "_")}_lesson.txt`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    SpeechEngine.speak(`Notes downloaded as raw text sheet file.`, voicePref);
+      SpeechEngine.speak(`Notes downloaded as DOCX file.`, voicePref);
+    } catch (err) {
+      console.error("DOCX export failed", err);
+      SpeechEngine.speak("DOCX export failed.", voicePref);
+    }
   };
 
   const handlePrintPdf = () => {
@@ -461,18 +496,18 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
       <div className="lg:col-span-5 space-y-6">
         
         {/* Unit Submission & Parser Form */}
-        <div className="bg-white rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-sm relative overflow-hidden">
+        <div className="bg-white rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-sm relative overflow-hidden">
           
-          <div className="flex items-center justify-between border-b border-[#0F766E]/15 pb-2">
+          <div className="flex items-center justify-between border-b border-[#4338CA]/15 pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-[#0F766E]/10 rounded-lg text-[#0F766E]">
+              <div className="p-1.5 bg-[#4338CA]/10 rounded-lg text-[#4338CA]">
                 <Upload className="w-5 h-5 animate-pulse" />
               </div>
-              <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-[#312E81] uppercase tracking-wider">
                 Upload & Convert (Phase 4)
               </h3>
             </div>
-            <span className="bg-emerald-500/10 text-emerald-700 text-[9px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="bg-indigo-500/10 text-indigo-700 text-[9px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
               PDF/Text Engine Ready
             </span>
           </div>
@@ -491,8 +526,8 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
             onDrop={handleDrop}
             className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
               isDragging 
-                ? "border-[#14B8A6] bg-[#14B8A6]/10 scale-95" 
-                : "border-[#0F766E]/20 hover:border-[#0F766E] bg-[#FFFBF5]/90 hover:bg-[#14B8A6]/5"
+                ? "border-[#6366F1] bg-[#6366F1]/10 scale-95" 
+                : "border-[#4338CA]/20 hover:border-[#4338CA] bg-[#F8FAFC]/90 hover:bg-[#6366F1]/5"
             }`}
           >
             <input
@@ -502,14 +537,14 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 const f = e.target.files?.[0];
                 if (f) handleFileUpload(f);
               }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             />
             <div className="space-y-2 pointer-events-none">
               <div className="p-3 bg-white/80 rounded-full inline-block shadow-xs">
-                <FileText className={`w-8 h-8 ${isDragging ? "text-[#14B8A6] animate-bounce" : "text-[#0F766E]"}`} />
+                <FileText className={`w-8 h-8 ${isDragging ? "text-[#6366F1] animate-bounce" : "text-[#4338CA]"}`} />
               </div>
               <div>
-                <p className="text-xs font-bold text-[#134E4A]">
+                <p className="text-xs font-bold text-[#312E81]">
                   Drag and drop academic PDF or Text here
                 </p>
                 <p className="text-[10px] text-gray-400 font-semibold mt-1">
@@ -521,13 +556,13 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
 
           {/* DYNAMIC COMPREHENSIVE PDF TEXTBOOK PREVIEW PANE (Phase 4 interactive requirement) */}
           {uploadedPdf && (
-            <div className="border border-[#0F766E]/15 bg-white/80 backdrop-blur-md rounded-2xl p-4 space-y-3 animate-fadeIn">
+            <div className="border border-[#4338CA]/15 bg-white/80 backdrop-blur-md rounded-2xl p-4 space-y-3 animate-fadeIn">
               
               {/* Document bar */}
-              <div className="flex justify-between items-center bg-[#FFFBF5] p-2.5 rounded-xl border border-tan/30 text-xs">
+              <div className="flex justify-between items-center bg-[#F8FAFC] p-2.5 rounded-xl border border-tan/30 text-xs">
                 <div>
-                  <h4 className="font-black text-[#134E4A] truncate max-w-[180px]">{uploadedPdf.name}</h4>
-                  <span className="text-[9px] text-[#0F766E]/80 font-bold uppercase">{uploadedPdf.size} • {uploadedPdf.pagesCount} Pages</span>
+                  <h4 className="font-black text-[#312E81] truncate max-w-[180px]">{uploadedPdf.name}</h4>
+                  <span className="text-[9px] text-[#4338CA]/80 font-bold uppercase">{uploadedPdf.size} • {uploadedPdf.pagesCount} Pages</span>
                 </div>
                 <button
                   id="btn-remove-pdf"
@@ -536,7 +571,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     setTitle("");
                     setContent("");
                   }}
-                  className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 cursor-pointer"
+                  className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   title="Remove document file context"
                 >
                   <X className="w-4 h-4" />
@@ -544,15 +579,15 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
               </div>
 
               {/* View options and Scaling controls */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#0F766E]/5 pb-2 text-[11px] font-bold">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#4338CA]/5 pb-2 text-[11px] font-bold">
                 
                 {/* View switcher code */}
-                <div className="flex bg-[#FFFBF5] rounded-lg p-0.5 border border-tan/30">
+                <div className="flex bg-[#F8FAFC] rounded-lg p-0.5 border border-tan/30">
                   <button
                     id="btn-pdf-view-visual"
                     type="button"
                     onClick={() => setPdfViewMode("visual")}
-                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "visual" ? "bg-[#0F766E] text-white" : "text-[#134E4A]/80 hover:bg-[#0F766E]/5"}`}
+                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "visual" ? "bg-[#4338CA] text-white" : "text-[#312E81]/80 hover:bg-[#4338CA]/5"}`}
                   >
                     Visual PDF
                   </button>
@@ -560,19 +595,19 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     id="btn-pdf-view-raw"
                     type="button"
                     onClick={() => setPdfViewMode("raw")}
-                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "raw" ? "bg-[#0F766E] text-white" : "text-[#134E4A]/80 hover:bg-[#0F766E]/5"}`}
+                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "raw" ? "bg-[#4338CA] text-white" : "text-[#312E81]/80 hover:bg-[#4338CA]/5"}`}
                   >
                     Plain Extract
                   </button>
                 </div>
 
                 {/* Scaling */}
-                <div className="flex items-center gap-1.5 bg-[#FFFBF5] rounded-lg p-1 px-2 border border-tan/30">
+                <div className="flex items-center gap-1.5 bg-[#F8FAFC] rounded-lg p-1 px-2 border border-tan/30">
                   <button 
                     id="btn-pdf-zoom-out"
                     type="button" 
                     onClick={() => setPdfZoom(Math.max(80, pdfZoom - 10))} 
-                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer"
+                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
@@ -581,7 +616,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     id="btn-pdf-zoom-in"
                     type="button" 
                     onClick={() => setPdfZoom(Math.min(150, pdfZoom + 10))} 
-                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer"
+                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
                   </button>
@@ -591,11 +626,11 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
 
               {/* Highlighter Tool Select Palette (Excellent support for accessibility!) */}
               <div className="flex items-center gap-2 text-xs bg-amber-500/5 p-2 rounded-xl border border-amber-200/40">
-                <span className="font-extrabold text-[#134E4A]">Highlighter Pen:</span>
+                <span className="font-extrabold text-[#312E81]">Highlighter Pen:</span>
                 <div className="flex items-center gap-1.5">
                   {[
                     { color: "bg-yellow-200", label: "Yellow", value: "yellow" },
-                    { color: "bg-emerald-200", label: "Green", value: "green" },
+                    { color: "bg-indigo-200", label: "Green", value: "green" },
                     { color: "bg-pink-300", label: "Pink", value: "pink" }
                   ].map((colorObj) => {
                     const isSelected = pdfActiveHighlightColor === colorObj.value;
@@ -623,14 +658,14 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
               </div>
 
               {/* TEXTBOOK VISUAL PAGE CONTENT CARRIER CONTAINER */}
-              <div className="bg-[#FFFBF5] border border-orange-50 rounded-xl p-3 max-h-56 overflow-y-auto relative shadow-inner">
+              <div className="bg-[#F8FAFC] border border-orange-50 rounded-xl p-3 max-h-56 overflow-y-auto relative shadow-inner">
                 {pdfViewMode === "visual" ? (
                   <div 
-                    className="space-y-3 p-1 font-sans text-xs leading-relaxed text-[#134E4A]/95"
+                    className="space-y-3 p-1 font-sans text-xs leading-relaxed text-[#312E81]/95"
                     style={{ fontSize: `${pdfZoom}%` }}
                   >
                     {/* Dynamic Textbook visual columns render pages based on uploadedPdf */}
-                    <div className="border-b border-[#0F766E]/10 pb-1 mb-2 flex justify-between items-center text-[10px] font-mono text-[#0F766E]/70 uppercase tracking-widest font-bold">
+                    <div className="border-b border-[#4338CA]/10 pb-1 mb-2 flex justify-between items-center text-[10px] font-mono text-[#4338CA]/70 uppercase tracking-widest font-bold">
                       <span>TEXTBOOK PREVIEW CHAPTER</span>
                       <span>PAGE {uploadedPdf.currentPage} OF {uploadedPdf.pagesCount}</span>
                     </div>
@@ -659,7 +694,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                             <p
                               key={idx}
                               onClick={() => toggleTextHighlight(paraVal)}
-                              className={`cursor-pointer select-none rounded p-1.5 transition-all text-justify hover:bg-[#0F766E]/5 ${
+                              className={`cursor-pointer select-none rounded p-1.5 transition-all text-justify hover:bg-[#4338CA]/5 ${
                                 isHighlighted ? "bg-yellow-200/90 shadow-2xs border border-yellow-300" : ""
                               }`}
                             >
@@ -672,14 +707,14 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
 
                   </div>
                 ) : (
-                  <pre className="text-[10px] leading-relaxed select-text font-mono text-[#134E4A] whitespace-pre-wrap">
+                  <pre className="text-[10px] leading-relaxed select-text font-mono text-[#312E81] whitespace-pre-wrap">
                     {uploadedPdf.text}
                   </pre>
                 )}
               </div>
 
               {/* PDF Paginate Bottom Control panel */}
-              <div className="flex justify-between items-center text-xs text-[#0F766E] font-bold">
+              <div className="flex justify-between items-center text-xs text-[#4338CA] font-bold">
                 <button
                   id="btn-pdf-prev-page"
                   type="button"
@@ -689,7 +724,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     setUploadedPdf({ ...uploadedPdf, currentPage: nextPage });
                     SpeechEngine.speak(`Navigated to page ${nextPage}.`, voicePref);
                   }}
-                  className="px-2.5 py-1.5 bg-[#FFFBF5] hover:bg-[#0F766E]/10 border border-[#0F766E]/10 rounded-xl flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                  className="px-2.5 py-1.5 bg-[#F8FAFC] hover:bg-[#4338CA]/10 border border-[#4338CA]/10 rounded-xl flex items-center gap-1 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" /> Previous
                 </button>
@@ -703,7 +738,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     setUploadedPdf({ ...uploadedPdf, currentPage: nextPage });
                     SpeechEngine.speak(`Navigated to page ${nextPage}.`, voicePref);
                   }}
-                  className="px-2.5 py-1.5 bg-[#FFFBF5] hover:bg-[#0F766E]/10 border border-[#0F766E]/10 rounded-xl flex items-center gap-1 cursor-pointer disabled:opacity-40"
+                  className="px-2.5 py-1.5 bg-[#F8FAFC] hover:bg-[#4338CA]/10 border border-[#4338CA]/10 rounded-xl flex items-center gap-1 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   Next <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -717,7 +752,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
             
             {/* Title text input */}
             <div>
-              <label htmlFor="notes-title" className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-1">
+              <label htmlFor="notes-title" className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-1">
                 Lesson / Textbook Title
               </label>
               <input
@@ -727,13 +762,13 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 placeholder="e.g. Biology Unit 3: Human Circulation"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm bg-[#FFFBF5] border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
+                className="w-full px-4 py-2.5 text-sm bg-[#F8FAFC] border border-[#4338CA]/10 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81]"
               />
             </div>
 
             {/* Paste content key text area */}
             <div>
-              <label htmlFor="notes-content" className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-1">
+              <label htmlFor="notes-content" className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-1">
                 Extracted Lesson content
               </label>
               <textarea
@@ -743,22 +778,22 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 placeholder="Paste paragraph curriculum, textbook content, or notes here..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full p-4 text-xs bg-[#FFFBF5] border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A] leading-relaxed resize-none"
+                className="w-full p-4 text-xs bg-[#F8FAFC] border border-[#4338CA]/10 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81] leading-relaxed resize-none"
               />
             </div>
 
             {/* Simulated Stage progress indicators bar during notes transformation */}
             {loadingGenerate && (
-              <div className="space-y-2 p-3 bg-teal-500/5 rounded-2xl border border-teal-200/30 animate-pulse">
-                <div className="flex justify-between text-xs font-bold text-[#0F766E]">
+              <div className="space-y-2 p-3 bg-indigo-500/5 rounded-[24px] border border-indigo-200/30 animate-pulse">
+                <div className="flex justify-between text-xs font-bold text-[#4338CA]">
                   <span>{progressStatus}</span>
                   <span>{generateProgress}%</span>
                 </div>
-                <div className="w-full bg-[#FFFBF5] h-2.5 rounded-full overflow-hidden border border-[#0F766E]/10 shadow-inner">
-                  <div className="bg-[#14B8A6] h-full transition-all duration-300" style={{ width: `${generateProgress}%` }} />
+                <div className="w-full bg-[#F8FAFC] h-2.5 rounded-full overflow-hidden border border-[#4338CA]/10 shadow-inner">
+                  <div className="bg-[#6366F1] h-full transition-all duration-300" style={{ width: `${generateProgress}%` }} />
                 </div>
-                <div className="flex items-center gap-1.5 text-[9.5px] text-teal-700 font-extrabold uppercase">
-                  <Info className="w-3 h-3 text-[#0F766E]" /> Generative AI model is compiling interactive learning materials.
+                <div className="flex items-center gap-1.5 text-[9.5px] text-indigo-700 font-extrabold uppercase">
+                  <Info className="w-3 h-3 text-[#4338CA]" /> Generative AI model is compiling interactive learning materials.
                 </div>
               </div>
             )}
@@ -768,7 +803,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
               id="notes-btn-generate"
               type="submit"
               disabled={loadingGenerate || isUploadingFile}
-              className="w-full py-3 bg-[#0F766E] text-white font-extrabold rounded-xl text-xs shadow-xs hover:bg-[#134E4A] transition-all disabled:opacity-50 cursor-pointer flex justify-center items-center gap-2 uppercase tracking-wide"
+              className="w-full py-3 bg-[#4338CA] text-white font-extrabold rounded-xl text-xs shadow-xs hover:bg-[#312E81] transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex justify-center items-center gap-2 uppercase tracking-wide focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <Sparkles className="w-4.5 h-4.5" />
               {loadingGenerate ? "Synthesizing AI study package..." : "Generate Custom AI Study Pack"}
@@ -779,12 +814,12 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
         </div>
 
         {/* SAVED NOTES CATALOGUE PANEL */}
-        <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 shadow-sm space-y-3">
+        <div className="card-soft p-6 rounded-3xl shadow-sm space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">
+            <h3 className="text-sm font-extrabold text-[#312E81] uppercase tracking-wider">
               Saved Lesson units ({notes.length})
             </h3>
-            <span className="bg-emerald-500/10 text-emerald-800 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase">
+            <span className="bg-indigo-500/10 text-indigo-800 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase">
               Relational DB
             </span>
           </div>
@@ -812,23 +847,23 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     onMouseEnter={() => handleMouseEnterText(`Note: ${note.title}`)}
                     className={`w-full text-left p-3.5 rounded-2xl transition-all cursor-pointer border flex items-center justify-between gap-2.5 truncate ${
                       isActive
-                        ? "bg-[#14B8A6]/10 border-[#14B8A6] text-[#0F766E] font-extrabold"
-                        : "border-[#0F766E]/5 hover:bg-[#FFFBF5] text-[#134E4A]/80 font-bold"
+                        ? "bg-[#6366F1]/10 border-[#6366F1] text-[#4338CA] font-extrabold"
+                        : "border-[#4338CA]/5 hover:bg-[#F8FAFC] text-[#312E81]/80 font-bold"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      <FileText className={`w-4 h-4 shrink-0 ${isActive ? "text-[#0F766E]" : "text-gray-400"}`} />
+                      <FileText className={`w-4 h-4 shrink-0 ${isActive ? "text-[#4338CA]" : "text-gray-400"}`} />
                       <span className="text-xs truncate">{note.title}</span>
                     </div>
-                    {isActive && <Check className="w-3.5 h-3.5 text-[#0F766E] shrink-0" />}
+                    {isActive && <Check className="w-3.5 h-3.5 text-[#4338CA] shrink-0" />}
                   </button>
                 );
               })}
             </div>
           ) : (
             <div className="text-center py-6 bg-slate-500/5 rounded-2xl">
-              <BookOpen className="w-8 h-8 text-[#134E4A]/25 mx-auto mb-1.5" />
-              <p className="text-xs text-[#134E4A]/60 font-semibold">Your study catalogue is empty.</p>
+              <BookOpen className="w-8 h-8 text-[#312E81]/25 mx-auto mb-1.5" />
+              <p className="text-xs text-[#312E81]/60 font-semibold">Your study catalogue is empty.</p>
             </div>
           )}
         </div>
@@ -839,13 +874,13 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
       <div className="lg:col-span-7">
         
         {activeNote ? (
-          <div className="bg-white rounded-3xl border border-[#0F766E]/10 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 overflow-hidden shadow-sm">
             
             {/* Header detail bar */}
-            <div className="p-6 bg-[#FFFBF5] border-b border-[#0F766E]/5 flex flex-col sm:flex-row sm:items-center sm:justify-between justify-center gap-4">
+            <div className="p-6 bg-[#F8FAFC] border-b border-[#4338CA]/5 flex flex-col sm:flex-row sm:items-center sm:justify-between justify-center gap-4">
               <div>
-                <span className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-wider block">Generated Material Package</span>
-                <h2 className="text-lg font-black text-[#134E4A] line-clamp-2">{activeNote.title}</h2>
+                <span className="text-[10px] font-bold text-[#6366F1] uppercase tracking-wider block">Generated Material Package</span>
+                <h2 className="text-lg font-black text-[#312E81] line-clamp-2">{activeNote.title}</h2>
               </div>
               
               {/* Core Recitation & Print/Export actions controls */}
@@ -855,7 +890,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 <button
                   id="notes-btn-recite"
                   onClick={handleReadActiveSegment}
-                  className="p-2.5 bg-[#0F766E] text-white hover:bg-[#134E4A] rounded-xl flex items-center gap-1 text-[11px] font-black cursor-pointer uppercase tracking-wider shadow-xs"
+                  className="p-2.5 bg-[#4338CA] text-white hover:bg-[#312E81] rounded-xl flex items-center gap-1 text-[11px] font-black cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 uppercase tracking-wider shadow-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   title="Speak out active slide info"
                 >
                   <Volume2 className="w-4 h-4" /> Recite Aloud
@@ -865,7 +900,7 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 <button
                   id="notes-btn-stop"
                   onClick={() => SpeechEngine.stop()}
-                  className="p-2.5 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center justify-center cursor-pointer"
+                  className="p-2.5 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center justify-center cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   title="Mute current voice speaker"
                 >
                   <StopCircle className="w-4.5 h-4.5" />
@@ -875,27 +910,27 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 <button
                   id="notes-btn-print"
                   onClick={handlePrintPdf}
-                  className="p-2.5 border border-[#0F766E]/25 text-[#0F766E] hover:bg-[#14B8A6]/10 rounded-xl cursor-pointer"
+                  className="p-2.5 border border-[#4338CA]/25 text-[#4338CA] hover:bg-[#6366F1]/10 rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   title="Print custom notes page perfectly"
                 >
                   <Printer className="w-4.5 h-4.5" />
                 </button>
 
-                {/* TXT Download file block */}
+                {/* DOCX Download file block */}
                 <button
-                  id="notes-btn-download-txt"
-                  onClick={handleDownloadTxt}
-                  className="p-2.5 border border-gray-200 text-gray-700 hover:bg-[#FFFBF5] rounded-xl cursor-pointer font-bold text-[11px]"
-                  title="Download unit notes to local TXT format"
+                  id="notes-btn-download-docx"
+                  onClick={handleDownloadDocx}
+                  className="p-2.5 border border-gray-200 text-gray-700 hover:bg-[#F8FAFC] rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 font-bold text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  title="Download unit notes to local DOCX format"
                 >
-                  TXT
+                  DOCX
                 </button>
 
               </div>
             </div>
 
             {/* Navigation tabs row */}
-            <div className="flex border-b border-[#0F766E]/10 overflow-x-auto bg-[#FFFBF5]/30">
+            <div className="flex border-b border-[#4338CA]/10 overflow-x-auto bg-[#F8FAFC]/30">
               {[
                 { id: "summary", label: "1. Summary" },
                 { id: "bullets", label: "2. Key Points" },
@@ -916,8 +951,8 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                     }}
                     className={`py-3 px-5 text-xs font-extrabold border-b-2 whitespace-nowrap cursor-pointer transition-all ${
                       isActive
-                        ? "border-[#0F766E] text-[#0F766E] bg-white font-black"
-                        : "border-transparent text-[#134E4A]/60 hover:text-[#0F766E] hover:bg-[#FFFBF5]/20"
+                        ? "border-[#4338CA] text-[#4338CA] bg-white font-black"
+                        : "border-transparent text-[#312E81]/60 hover:text-[#4338CA] hover:bg-[#F8FAFC]/20"
                     }`}
                   >
                     {tab.label}
@@ -927,33 +962,33 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
             </div>
 
             {/* Tab content display frame */}
-            <div className="p-6 md:p-8 min-h-96 text-[#134E4A]/90">
+            <div className="p-6 md:p-8 min-h-96 text-[#312E81]/90">
               
               {/* PRINT ELEMENT STYLING - Hidden on screen, visible during printing */}
-              <div className="hidden print:block space-y-6 text-[#134E4A]">
-                <div className="border-b-2 border-[#0F766E] pb-2 mb-6">
+              <div className="hidden print:block space-y-6 text-[#312E81]">
+                <div className="border-b-2 border-[#4338CA] pb-2 mb-6">
                   <h1 className="text-2xl font-black">{activeNote.title}</h1>
-                  <p className="text-xs font-bold text-[#0F766E] uppercase tracking-widest">Study Guide Lesson Workbook</p>
+                  <p className="text-xs font-bold text-[#4338CA] uppercase tracking-widest">Study Guide Lesson Workbook</p>
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 uppercase">I. Chapter Summary Outline</h3>
+                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 uppercase">I. Chapter Summary Outline</h3>
                   <p className="text-xs leading-relaxed">{activeNote.summary}</p>
                   
-                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">II. Important Highlight Points</h3>
+                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">II. Important Highlight Points</h3>
                   <ul className="list-disc pl-5 text-xs space-y-1">
                     {activeNote.bulletPoints.map((b, i) => <li key={i}>{b}</li>)}
                   </ul>
 
-                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">III. Simplified Metaphorical Analogy</h3>
+                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">III. Simplified Metaphorical Analogy</h3>
                   <p className="text-xs leading-relaxed italic">{activeNote.easyExplanation}</p>
 
-                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">IV. Exam Cheat Sheet Cues</h3>
+                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">IV. Exam Cheat Sheet Cues</h3>
                   <p className="text-xs leading-relaxed">{activeNote.examNotes}</p>
 
-                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">V. Active Definitions Dictionary</h3>
+                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">V. Active Definitions Dictionary</h3>
                   <div className="space-y-4">
                     {activeNote.keyDefinitions.map((d, i) => (
-                      <div key={i} className="text-xs"><strong className="text-[#0F766E]">{d.term}:</strong> {d.definition}</div>
+                      <div key={i} className="text-xs"><strong className="text-[#4338CA]">{d.term}:</strong> {d.definition}</div>
                     ))}
                   </div>
                 </div>
@@ -964,138 +999,131 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                 
                 {/* 1. Summary overview page */}
                 {detailTab === "summary" && (
-                  <div className="space-y-4 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.summary)}>
-                    <div className="flex items-center gap-2">
-                      <BookOpen className="w-5 h-5 text-[#0F766E]" />
-                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Chapter Summary Outline</h3>
-                    </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                    <p className="text-xs leading-relaxed font-semibold text-gray-700 whitespace-pre-line bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50">
-                      {activeNote.summary}
-                    </p>
-                  </div>
-                )}
-
-                {/* 2. Interactive Key highlight points (with Mastery checklist tracker checks) */}
-                {detailTab === "bullets" && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-6 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.summary)}>
+                    <div className="space-y-4">
                       <div className="flex items-center gap-2">
-                        <CheckCircle className="w-5 h-5 text-[#0F766E]" />
-                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Interactive Study Highlights</h3>
+                        <BookOpen className="w-5 h-5 text-[#4338CA]" />
+                        <h3 className="text-sm font-extrabold text-[#4338CA] uppercase tracking-wider">Chapter Summary Outline</h3>
                       </div>
-                      <span className="text-[10px] text-[#0F766E] font-black uppercase tracking-wider">Click row to mark mastered</span>
+                      <div className="h-0.5 bg-gradient-to-r from-[#4338CA]/10 to-transparent w-full" />
+                      <p className="text-xs leading-relaxed font-semibold text-gray-700 whitespace-pre-line bg-[#F8FAFC]/40 p-4 rounded-2xl border border-orange-50">
+                        {activeNote.summary}
+                      </p>
                     </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                    
-                    <ul className="space-y-3">
-                      {activeNote.bulletPoints.map((point, index) => {
-                        const isMastered = !!masteredBullets[point];
-                        return (
-                          <li 
-                            key={index} 
-                            onClick={() => {
-                              const nextState = !isMastered;
-                              setMasteredBullets({ ...masteredBullets, [point]: nextState });
-                              SpeechEngine.speak(nextState ? "Marked highlight point as mastered." : "Highlight point marked for review study.", voicePref);
-                            }}
-                            className={`flex items-start gap-3 text-xs font-semibold p-4 rounded-2xl border transition-all cursor-pointer select-none ${
-                              isMastered 
-                                ? "bg-emerald-500/10 border-emerald-400/40 text-emerald-900" 
-                                : "bg-[#FFFBF5] border-[#0F766E]/5 text-gray-700 hover:bg-teal-50/10"
-                            }`}
-                            onMouseEnter={() => handleMouseEnterText(point)}
-                          >
-                            <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border shrink-0 mt-0.5 transition-all ${
-                              isMastered ? "bg-emerald-600 border-emerald-700 text-white" : "border-gray-400 bg-white"
-                            }`}>
-                              {isMastered && <Check className="w-3 h-3 text-white" />}
+
+                    {(activeNote.most_important_topics && activeNote.most_important_topics.length > 0) && (
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Layers className="w-5 h-5 text-amber-500" />
+                          <h3 className="text-sm font-extrabold text-[#4338CA] uppercase tracking-wider">Most Important Topics Ranked</h3>
+                        </div>
+                        <div className="h-0.5 bg-gradient-to-r from-[#4338CA]/10 to-transparent w-full" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {activeNote.most_important_topics.map((t, idx) => (
+                            <div key={idx} className="p-3 bg-amber-50 border border-amber-100 rounded-xl flex items-center gap-3">
+                              <span className="w-6 h-6 shrink-0 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-black">#{t.rank}</span>
+                              <span className="text-xs font-bold text-gray-800">{t.topic}</span>
                             </div>
-                            <span className={isMastered ? "line-through opacity-75" : ""}>{point}</span>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* 3. Detailed exam cheat sheet notes */}
-                {detailTab === "exam" && (
-                  <div className="space-y-4 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.examNotes)}>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-amber-500" />
-                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Exam Cues & Takeaways Cheat Sheet</h3>
-                    </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                    
-                    <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 relative">
-                      <p className="text-xs leading-relaxed text-[#134E4A] font-bold whitespace-pre-line">
-                        {activeNote.examNotes}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* 4. Easy metaphors block for accessibility learning needs */}
-                {detailTab === "easy" && (
-                  <div className="space-y-4 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.easyExplanation)}>
-                    <div className="flex items-center gap-2">
-                      <span className="p-1 px-1.5 bg-sky-100 text-sky-700 rounded-lg text-xs">💡</span>
-                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Conversational Explanation metamodel</h3>
-                    </div>
-                    <span className="text-[10px] text-[#0F766E] block font-extrabold uppercase mt-0.5">Perfect for screen readers or simplified study sessions</span>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                    
-                    <div className="p-5 rounded-2xl bg-sky-500/5 border border-sky-400/20">
-                      <p className="text-xs leading-relaxed text-sky-950 font-bold italic">
-                        "{activeNote.easyExplanation}"
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. Key definitions dynamic flash dictionaries */}
-                {detailTab === "definitions" && (
+                {/* 2. Key Concepts */}
+                {detailTab === "concepts" && (
                   <div className="space-y-4 animate-fadeIn">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Layers className="w-5 h-5 text-[#0F766E]" />
-                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider font-sans">Definitions dictionary</h3>
+                        <Layers className="w-5 h-5 text-[#4338CA]" />
+                        <h3 className="text-sm font-extrabold text-[#4338CA] uppercase tracking-wider">Key Concepts & Explanations</h3>
                       </div>
-                      <span className="text-[10px] text-[#0F766E] font-black uppercase">Study definitions</span>
                     </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-
+                    <div className="h-0.5 bg-gradient-to-r from-[#4338CA]/10 to-transparent w-full" />
+                    
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {activeNote.keyDefinitions.map((def, idx) => (
-                        <div
-                          key={idx}
-                          onMouseEnter={() => handleMouseEnterText(`${def.term}: ${def.definition}`)}
-                          className="p-4 rounded-2xl border border-[#0F766E]/10 bg-[#FFFBF5] hover:border-[#0F766E] hover:bg-white transition-all space-y-1.5 relative group"
-                        >
-                          <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-widest font-mono">TERM DEFINED</span>
-                          <h4 className="text-xs uppercase tracking-widest font-black text-[#0F766E]">
-                            {def.term}
-                          </h4>
-                          <p className="text-xs text-[#134E4A]/80 leading-relaxed font-semibold">
-                            {def.definition}
-                          </p>
+                      {(activeNote.key_concepts || []).map((concept, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl border border-[#4338CA]/10 bg-[#F8FAFC] hover:border-[#4338CA] transition-all space-y-2">
+                          <h4 className="text-xs uppercase font-black text-[#4338CA]">{concept.concept}</h4>
+                          <p className="text-xs text-gray-700 font-semibold">{concept.explanation}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
+                {/* 3. Detailed exam cheat sheet notes */}
+                {detailTab === "exam" && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-amber-500" />
+                      <h3 className="text-sm font-extrabold text-[#4338CA] uppercase tracking-wider">Exam Cues & Takeaways Cheat Sheet</h3>
+                    </div>
+                    <div className="h-0.5 bg-gradient-to-r from-[#4338CA]/10 to-transparent w-full" />
+                    
+                    <div className="p-5 rounded-2xl bg-amber-500/5 border border-amber-500/10 space-y-3">
+                      {(activeNote.exam_points || activeNote.important_notes || []).map((point, index) => (
+                        <div key={index} className="flex gap-3 items-start p-3 bg-white/60 rounded-xl border border-amber-100">
+                          <CheckCircle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                          <span className="text-xs font-bold text-[#312E81]">{point}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Quick Revision Sheet */}
+                {detailTab === "revision" && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 px-1.5 bg-sky-100 text-sky-700 rounded-lg text-xs">💡</span>
+                      <h3 className="text-sm font-extrabold text-[#4338CA] uppercase tracking-wider">Quick Revision Sheet</h3>
+                    </div>
+                    <div className="h-0.5 bg-gradient-to-r from-[#4338CA]/10 to-transparent w-full" />
+                    
+                    <div className="p-5 rounded-2xl bg-sky-500/5 border border-sky-400/20 space-y-4">
+                      {(activeNote.revision_sheet || []).map((point, idx) => (
+                        <p key={idx} className="text-xs leading-relaxed text-sky-950 font-bold">
+                          • {point}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Frequently Asked Questions */}
+                {detailTab === "faq" && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Info className="w-5 h-5 text-[#4338CA]" />
+                        <h3 className="text-sm font-extrabold text-[#4338CA] uppercase tracking-wider font-sans">Frequently Asked Questions</h3>
+                      </div>
+                    </div>
+                    <div className="h-0.5 bg-gradient-to-r from-[#4338CA]/10 to-transparent w-full" />
+
+                    <div className="space-y-3">
+                      {(activeNote.frequently_asked_questions || []).map((faq, idx) => (
+                        <div key={idx} className="p-4 rounded-2xl border border-gray-200 bg-white shadow-sm space-y-2">
+                          <h4 className="text-xs font-black text-[#312E81] flex gap-2"><span className="text-[#6366F1]">Q:</span> {faq.question}</h4>
+                          <div className="h-px w-full bg-gray-100" />
+                          <p className="text-xs text-gray-600 font-semibold flex gap-2"><span className="text-green-500 font-black">A:</span> {faq.answer}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
             </div>
 
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-[#0F766E]/10 p-12 text-center shadow-sm">
-            <BookOpen className="w-16 h-16 text-[#134E4A]/25 mx-auto mb-4 animate-bounce" />
-            <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">No active converted unit</h3>
-            <p className="text-xs text-[#134E4A]/60 max-w-sm mx-auto font-semibold leading-relaxed mt-1">
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-12 text-center shadow-sm">
+            <BookOpen className="w-16 h-16 text-[#312E81]/25 mx-auto mb-4 animate-bounce" />
+            <h3 className="text-sm font-extrabold text-[#312E81] uppercase tracking-wider">No active converted unit</h3>
+            <p className="text-xs text-[#312E81]/60 max-w-sm mx-auto font-semibold leading-relaxed mt-1">
               Select or drop an academic textbook unit file inside the left uploader panel. The generative API will synthesize a comprehensive workspace containing summaries, metaphors, practice exams, and definitions.
             </p>
           </div>

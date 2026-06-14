@@ -362,34 +362,35 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
       <div className="lg:col-span-4 space-y-6">
         
         {/* Setup Card */}
-        <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 shadow-xs space-y-4">
+        <div className="card-soft p-6 rounded-3xl shadow-xs space-y-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#E6F4F1] rounded-xl text-[#0F766E]">
+            <div className="p-2 bg-[#E6F4F1] rounded-xl text-[#4338CA]">
               <Brain className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wide">Quiz Setup Console</h3>
-              <span className="text-[10px] bg-[#14B8A6]/10 text-[#0F766E] px-2 py-0.5 rounded-full font-bold">Phase 5 Active</span>
+              <h3 className="text-sm font-black text-[#312E81] uppercase tracking-wide">Quiz Setup Console</h3>
+              <span className="text-[10px] bg-[#6366F1]/10 text-[#4338CA] px-2 py-0.5 rounded-full font-bold">Phase 5 Active</span>
             </div>
           </div>
 
-          <p className="text-xs text-[#134E4A]/75 leading-relaxed font-semibold">
+          <p className="text-xs text-[#312E81]/75 leading-relaxed font-semibold">
             Choose custom formats, adjust active countdown timers, and generate beautiful dynamic quizzes derived directly from your notes.
           </p>
 
-          <hr className="border-[#0F766E]/10" />
+          <hr className="border-[#4338CA]/10" />
 
           <div className="space-y-4">
             {/* Note Selector */}
             <div>
-              <label htmlFor="select-note-src" className="block text-[10px] font-black text-[#134E4A]/60 uppercase tracking-widest mb-1.5 font-sans">
+              <label htmlFor="select-note-src" className="block text-[10px] font-black text-[#312E81]/60 uppercase tracking-widest mb-1.5 font-sans">
                 1. Select Study Notes
               </label>
               <select
                 id="select-note-src"
                 value={selectedNoteId}
                 onChange={(e) => setSelectedNoteId(e.target.value)}
-                className="w-full px-3 py-2.5 text-xs bg-[#FFFBF5] border border-[#0F766E]/15 rounded-xl block font-bold text-[#134E4A] focus:ring-2 focus:ring-[#0F766E]/25 focus:outline-none"
+                disabled={notes.length === 0}
+                className="w-full px-3 py-2.5 text-xs bg-[#F8FAFC] border border-[#4338CA]/15 rounded-xl block font-bold text-[#312E81] focus:ring-2 focus:ring-[#4338CA]/25 focus:outline-none disabled:opacity-50"
               >
                 {notes.length === 0 ? (
                   <option value="">-- No uploaded notes found --</option>
@@ -405,7 +406,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
 
             {/* Quiz Type Selector (MCQ, True/False, Short Answer, Mix) */}
             <div>
-              <label className="block text-[10px] font-black text-[#134E4A]/60 uppercase tracking-widest mb-1.5 font-sans">
+              <label className="block text-[10px] font-black text-[#312E81]/60 uppercase tracking-widest mb-1.5 font-sans">
                 2. Quiz Question Type
               </label>
               <div className="grid grid-cols-2 gap-2">
@@ -423,8 +424,8 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                     }}
                     className={`px-3 py-2 text-left rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer ${
                       quizType === type.id
-                        ? "bg-[#0F766E] border-[#0F766E] text-white shadow-xs"
-                        : "bg-white border-[#0F766E]/10 text-[#134E4A] hover:bg-[#FFEFCF]/10"
+                        ? "bg-[#4338CA] border-[#4338CA] text-white shadow-xs"
+                        : "bg-white border-[#4338CA]/10 text-[#312E81] hover:bg-[#FFEFCF]/10"
                     }`}
                   >
                     {type.label}
@@ -435,7 +436,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
 
             {/* Questions Length Selector */}
             <div>
-              <label className="block text-[10px] font-black text-[#134E4A]/60 uppercase tracking-widest mb-1.5 font-sans">
+              <label className="block text-[10px] font-black text-[#312E81]/60 uppercase tracking-widest mb-1.5 font-sans">
                 3. Challenge Length
               </label>
               <div className="flex gap-2">
@@ -448,8 +449,8 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                     }}
                     className={`flex-1 py-1.5 rounded-xl border text-xs font-black transition-all cursor-pointer ${
                       numQuestions === val
-                        ? "bg-[#0F766E] border-[#0F766E] text-white shadow-xs"
-                        : "bg-white border-[#0F766E]/10 text-[#134E4A]"
+                        ? "bg-[#4338CA] border-[#4338CA] text-white shadow-xs"
+                        : "bg-white border-[#4338CA]/10 text-[#312E81]"
                     }`}
                   >
                     {val} Qs
@@ -460,7 +461,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
 
             {/* Timer Setup (Timer feature requirement) */}
             <div>
-              <label className="block text-[10px] font-black text-[#134E4A]/60 uppercase tracking-widest mb-1.5 font-sans">
+              <label className="block text-[10px] font-black text-[#312E81]/60 uppercase tracking-widest mb-1.5 font-sans">
                 4. Timer (Per Question)
               </label>
               <div className="grid grid-cols-4 gap-1.5">
@@ -478,8 +479,8 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                     }}
                     className={`py-2 rounded-xl border text-[11px] font-bold transition-all cursor-pointer ${
                       timerSetting === t.sec
-                        ? "bg-[#0F766E] border-[#0F766E] text-white shadow-xs"
-                        : "bg-white border-[#0F766E]/10 text-[#134E4A]"
+                        ? "bg-[#4338CA] border-[#4338CA] text-white shadow-xs"
+                        : "bg-white border-[#4338CA]/10 text-[#312E81]"
                     }`}
                   >
                     {t.tag}
@@ -492,7 +493,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
               id="start-quiz-generation"
               onClick={handleGenerateQuiz}
               disabled={generatingQuiz || notes.length === 0}
-              className="w-full py-3.5 bg-[#0F766E] text-white font-extrabold rounded-2xl text-sm shadow-xs hover:bg-[#134E4A] transition-all disabled:opacity-50 cursor-pointer flex justify-center items-center gap-2"
+              className="w-full py-3.5 bg-[#4338CA] text-white font-extrabold rounded-2xl text-sm shadow-xs hover:bg-[#312E81] transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex justify-center items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <Play className="w-4 h-4 shrink-0 fill-current" />
               {generatingQuiz ? "Forming Questions..." : "Generate Practice Quiz"}
@@ -501,16 +502,16 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
         </div>
 
         {/* Global Real-time leaderboards (Leaderboard requirement) */}
-        <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 shadow-xs">
+        <div className="card-soft p-6 rounded-3xl shadow-xs">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500 fill-amber-100" />
-              <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wide">Study Buddy Ladder</h3>
+              <h3 className="text-sm font-black text-[#312E81] uppercase tracking-wide">Study Buddy Ladder</h3>
             </div>
             <span className="text-[9px] bg-amber-105 text-amber-800 font-extrabold px-2 py-0.5 rounded-full uppercase">Realtime</span>
           </div>
 
-          <p className="text-[10px] text-[#134E4A]/70 mb-3 leading-snug font-medium">
+          <p className="text-[10px] text-[#312E81]/70 mb-3 leading-snug font-medium">
             Gain ranking position based on test correctness, speed completions, and consistent study hours.
           </p>
           
@@ -520,17 +521,17 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
               return (
                 <div 
                   key={idx} 
-                  className="flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all bg-[#FFFBF5] border border-[#0F766E]/5 text-[#134E4A]"
+                  className="flex items-center justify-between p-2.5 rounded-xl text-xs font-bold transition-all bg-[#F8FAFC] border border-[#4338CA]/5 text-[#312E81]"
                   onMouseEnter={() => handleMouseEnterText(`Rank ${idx + 1}: ${student.fullName} with average score of ${student.averageScore} percent over ${student.quizzesCount} studies.`)}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-base shrink-0">{rankIcon}</span>
                     <div className="truncate max-w-[130px]">
                       <span className="block truncate font-black">{student.fullName}</span>
-                      <span className="text-[9px] text-[#134E4A]/50 block font-semibold">{student.quizzesCount} resolved • {student.studyHours}h study</span>
+                      <span className="text-[9px] text-[#312E81]/50 block font-semibold">{student.quizzesCount} resolved • {student.studyHours}h study</span>
                     </div>
                   </div>
-                  <span className="bg-[#14B8A6]/15 hover:bg-[#14B8A6]/25 px-2.5 py-1.5 rounded-xl text-[#0F766E] font-black text-[11px] shrink-0">
+                  <span className="bg-[#6366F1]/15 hover:bg-[#6366F1]/25 px-2.5 py-1.5 rounded-xl text-[#4338CA] font-black text-[11px] shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
                     {student.averageScore}%
                   </span>
                 </div>
@@ -546,12 +547,12 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
         
         {activeQuiz && !quizFinished ? (
           /* Active Interactive Evaluation Screen */
-          <div className="bg-white rounded-3xl border border-[#0F766E]/10 shadow-xs overflow-hidden">
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 shadow-xs overflow-hidden">
             
             {/* Header with Visual progress bar */}
-            <div className="p-6 bg-[#FFFBF5] border-b border-[#0F766E]/10 flex justify-between items-center relative">
+            <div className="p-6 bg-[#F8FAFC] border-b border-[#4338CA]/10 flex justify-between items-center relative">
               <div className="space-y-1">
-                <span className="text-[10px] font-black text-[#14B8A6] uppercase tracking-widest block">Active practice study assistant</span>
+                <span className="text-[10px] font-black text-[#6366F1] uppercase tracking-widest block">Active practice study assistant</span>
                 <h4 className="text-sm font-extrabold text-[#111] truncate max-w-sm lg:max-w-md">{activeQuiz.title}</h4>
               </div>
 
@@ -562,14 +563,14 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                     ? "bg-rose-100 text-rose-700 animate-bounce" 
                     : timeLeft <= 20 
                     ? "bg-amber-100 text-amber-700" 
-                    : "bg-[#0F766E]/10 text-[#0F766E]"
+                    : "bg-[#4338CA]/10 text-[#4338CA]"
                 }`}>
                   <Timer className={`w-4 h-4 shrink-0 ${timeLeft <= 10 && "animate-spin"}`} />
                   <span>{timeLeft}s remaining</span>
                 </div>
               ) : (
-                <div className="flex items-center gap-1.5 bg-[#FFF] border border-[#0F766E]/10 px-3.5 py-2 rounded-2xl font-black text-[11px] text-[#134E4A]/80 shrink-0">
-                  <Hourglass className="w-3.5 h-3.5 text-[#14B8A6]" />
+                <div className="flex items-center gap-1.5 bg-[#FFF] border border-[#4338CA]/10 px-3.5 py-2 rounded-2xl font-black text-[11px] text-[#312E81]/80 shrink-0">
+                  <Hourglass className="w-3.5 h-3.5 text-[#6366F1]" />
                   <span>No Speed Limit</span>
                 </div>
               )}
@@ -583,7 +584,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                         ? "bg-rose-500" 
                         : timeLeft <= 25 
                         ? "bg-amber-500" 
-                        : "bg-[#14B8A6]"
+                        : "bg-[#6366F1]"
                     }`}
                     style={{ width: `${(timeLeft / timerSetting) * 100}%` }}
                   />
@@ -596,11 +597,11 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
               
               <div className="flex justify-between items-start gap-4">
                 <div className="space-y-1">
-                  <span className="text-xs font-black text-[#14B8A6] uppercase tracking-wider block">
+                  <span className="text-xs font-black text-[#6366F1] uppercase tracking-wider block">
                     Question {currentQuestionIdx + 1} of {activeQuiz.questions.length} • Format Match: {activeQuiz.questions[currentQuestionIdx].type.toUpperCase()}
                   </span>
                   <h3 
-                    className="text-lg lg:text-xl font-black text-[#134E4A] leading-tight cursor-default"
+                    className="text-lg lg:text-xl font-black text-[#312E81] leading-tight cursor-default"
                     onMouseEnter={() => handleMouseEnterText(activeQuiz.questions[currentQuestionIdx].question)}
                   >
                     {activeQuiz.questions[currentQuestionIdx].question}
@@ -612,7 +613,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                   id="speak-active-question"
                   onClick={handleSpeakQuestion}
                   title="Speak query and choices read aloud"
-                  className="p-2.5 bg-[#E6F4F1] text-[#0F766E] hover:bg-[#0F766E] hover:text-white rounded-xl transition-all cursor-pointer shrink-0"
+                  className="p-2.5 bg-[#E6F4F1] text-[#4338CA] hover:bg-[#4338CA] hover:text-white rounded-xl transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                 >
                   <Volume2 className="w-5 h-5 shrink-0" />
                 </button>
@@ -623,7 +624,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                 {activeQuiz.questions[currentQuestionIdx].type === "short" ? (
                   /* TYPE Short Answer text input with validation indicators */
                   <div className="space-y-2">
-                    <label htmlFor="short-answer-text-input" className="block text-[10px] font-black text-[#134E4A]/60 uppercase tracking-widest">
+                    <label htmlFor="short-answer-text-input" className="block text-[10px] font-black text-[#312E81]/60 uppercase tracking-widest">
                       Type Your Concept Answer phrase
                     </label>
                     <input
@@ -633,9 +634,9 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                       disabled={showExplanation}
                       value={shortAnswerInput}
                       onChange={(e) => setShortAnswerInput(e.target.value)}
-                      className="w-full px-5 py-4 bg-[#FFFBF5] text-sm border-2 border-[#0F766E]/15 rounded-2xl block text-[#134E4A] font-extrabold focus:outline-none focus:ring-3 focus:ring-[#0F766E]/20"
+                      className="w-full px-5 py-4 bg-[#F8FAFC] text-sm border-2 border-[#4338CA]/15 rounded-2xl block text-[#312E81] font-extrabold focus:outline-none focus:ring-3 focus:ring-[#4338CA]/20"
                     />
-                    <span className="text-[10px] text-[#134E4A]/65 font-bold italic block">
+                    <span className="text-[10px] text-[#312E81]/65 font-bold italic block">
                       💡 Self checks match direct key terms. Check spelling before validation.
                     </span>
                   </div>
@@ -646,8 +647,8 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                     const isAnswerVerified = showExplanation;
                     const isCorrect = opt.trim().toLowerCase() === activeQuiz.questions[currentQuestionIdx].correctAnswer.trim().toLowerCase();
 
-                    let btnStyle = "border-[#0F766E]/10 hover:border-[#0F766E]/30 text-[#134E4A] hover:bg-[#14B8A6]/5";
-                    if (isSelected) btnStyle = "bg-[#0F766E] border-[#0F766E] text-white shadow-xs font-black";
+                    let btnStyle = "border-[#4338CA]/10 hover:border-[#4338CA]/30 text-[#312E81] hover:bg-[#6366F1]/5";
+                    if (isSelected) btnStyle = "bg-[#4338CA] border-[#4338CA] text-white shadow-xs font-black";
                     
                     if (isAnswerVerified) {
                       if (isCorrect) btnStyle = "bg-green-100 border-2 border-green-500 text-green-950 font-black";
@@ -664,7 +665,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                       >
                         <div className="flex items-center gap-3">
                           <span className={`text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-lg shrink-0 ${
-                            isSelected ? "bg-white text-[#0F766E]" : "bg-[#14B8A6]/10 text-[#0F766E]"
+                            isSelected ? "bg-white text-[#4338CA]" : "bg-[#6366F1]/10 text-[#4338CA]"
                           }`}>
                             {String.fromCharCode(65 + idx)}
                           </span>
@@ -678,7 +679,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
 
               {/* Instant feedback region */}
               {showExplanation ? (
-                <div className="space-y-5 pt-4 border-t border-dashed border-[#0F766E]/15">
+                <div className="space-y-5 pt-4 border-t border-dashed border-[#4338CA]/15">
                   
                   {/* Correctness banner */}
                   {(() => {
@@ -717,7 +718,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                               Correct term: <span className="font-black underline">{corrAns}</span>
                             </span>
                           </div>
-                          <p className="text-xs text-[#134E4A]/80 mt-2 font-bold leading-relaxed">
+                          <p className="text-xs text-[#312E81]/80 mt-2 font-bold leading-relaxed">
                             💡 {activeQuiz.questions[currentQuestionIdx].explanation}
                           </p>
                         </div>
@@ -728,7 +729,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                   <button
                     id="submit-next-question"
                     onClick={handleNextQuestion}
-                    className="w-full py-4 bg-[#0F766E] hover:bg-[#134E4A] text-white font-extrabold rounded-2xl text-sm shadow-xs transition-colors flex justify-center items-center gap-1.5 cursor-pointer"
+                    className="w-full py-4 bg-[#4338CA] hover:bg-[#312E81] text-white font-extrabold rounded-2xl text-sm shadow-xs transition-colors flex justify-center items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     <span>
                       {currentQuestionIdx + 1 === activeQuiz.questions.length ? "Finish & Compute Evaluation Metrics" : "Proceed to Next Question"}
@@ -738,7 +739,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
 
                 </div>
               ) : (
-                <div className="pt-4 border-t border-[#0F766E]/10">
+                <div className="pt-4 border-t border-[#4338CA]/10">
                   <button
                     id="submit-verify-answer"
                     onClick={handleVerifyAnswer}
@@ -747,7 +748,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                         ? !shortAnswerInput.trim() && timeLeft > 0
                         : !selectedAnswers[activeQuiz.questions[currentQuestionIdx].id] && timeLeft > 0
                     }
-                    className="w-full py-4 bg-[#14B8A6] hover:bg-[#0F766E] text-white font-extrabold rounded-2xl text-xs lg:text-sm tracking-wide shadow-xs transition-all cursor-pointer disabled:opacity-40"
+                    className="w-full py-4 bg-[#6366F1] hover:bg-[#4338CA] text-white font-extrabold rounded-2xl text-xs lg:text-sm tracking-wide shadow-xs transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     Validate and Verify Answer (Instant Feedback)
                   </button>
@@ -759,25 +760,25 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
           </div>
         ) : quizFinished ? (
           /* Finished scorecards dynamic metrics */
-          <div className="bg-white rounded-3xl border border-[#0F766E]/10 p-10 text-center shadow-xs space-y-6">
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-10 text-center shadow-xs space-y-6">
             <div className="inline-flex p-4 rounded-full bg-amber-50 text-amber-500 border border-amber-200">
               <Award className="w-14 h-14 shrink-0 animate-bounce" />
             </div>
 
             <div className="space-y-1.5">
-              <h3 className="text-xl lg:text-2xl font-black text-[#134E4A] tracking-tight">Practice Session Completed</h3>
-              <p className="text-xs text-[#134E4A]/70 max-w-sm mx-auto leading-relaxed font-bold">
+              <h3 className="text-xl lg:text-2xl font-black text-[#312E81] tracking-tight">Practice Session Completed</h3>
+              <p className="text-xs text-[#312E81]/70 max-w-sm mx-auto leading-relaxed font-bold">
                 Excellent perseverance! Your achievements have been registered inside your persistent study profile database.
               </p>
             </div>
 
             {/* Score calculation displays */}
-            <div className="max-w-xs mx-auto bg-[#FFFBF5] rounded-3xl p-6 border-2 border-dashed border-[#0F766E]/20 space-y-2">
-              <span className="text-[10px] font-black text-[#134E4A]/60 block uppercase tracking-widest">Calculated Score</span>
-              <div className="text-5xl font-black text-[#0F766E] font-mono leading-none">
-                {quizScore} <span className="text-xl text-[#134E4A]/40 font-bold">/ {activeQuiz?.questions.length}</span>
+            <div className="max-w-xs mx-auto bg-[#F8FAFC] rounded-3xl p-6 border-2 border-dashed border-[#4338CA]/20 space-y-2">
+              <span className="text-[10px] font-black text-[#312E81]/60 block uppercase tracking-widest">Calculated Score</span>
+              <div className="text-5xl font-black text-[#4338CA] font-mono leading-none">
+                {quizScore} <span className="text-xl text-[#312E81]/40 font-bold">/ {activeQuiz?.questions.length}</span>
               </div>
-              <span className="text-xs font-black text-[#14B8A6] block mt-1">
+              <span className="text-xs font-black text-[#6366F1] block mt-1">
                 {Math.round((quizScore / (activeQuiz?.questions.length || 5)) * 100)}% Pass Rating
               </span>
             </div>
@@ -790,7 +791,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
                   setQuizFinished(false);
                   loadResources();
                 }}
-                className="px-6 py-3.5 bg-[#0F766E] text-white font-extrabold rounded-xl shadow-xs hover:bg-[#134E4A] transition-all cursor-pointer text-xs lg:text-sm flex items-center gap-2"
+                className="px-6 py-3.5 bg-[#4338CA] text-white font-extrabold rounded-xl shadow-xs hover:bg-[#312E81] transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 text-xs lg:text-sm flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
               >
                 <RefreshCw className="w-4 h-4 shrink-0" /> Try Another Format
               </button>
@@ -798,32 +799,32 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
           </div>
         ) : (
           /* Waiting Launcher Instructions dashboard */
-          <div className="bg-white rounded-3xl border border-[#0F766E]/10 p-12 text-center shadow-xs space-y-6">
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-12 text-center shadow-xs space-y-6">
             
             {/* Simple Dynamic Metrics banner card */}
             <div className="grid grid-cols-3 gap-4 text-center max-w-lg mx-auto mb-2">
-              <div className="bg-[#FFFBF5] p-3 rounded-2xl border border-[#0F766E]/10">
-                <span className="text-[9px] font-black text-[#134E4A]/50 block uppercase">Attempted Sessions</span>
-                <span className="text-lg font-black text-[#0F766E]">{cumulativeTries} tries</span>
+              <div className="bg-[#F8FAFC] p-3 rounded-2xl border border-[#4338CA]/10">
+                <span className="text-[9px] font-black text-[#312E81]/50 block uppercase">Attempted Sessions</span>
+                <span className="text-lg font-black text-[#4338CA]">{cumulativeTries} tries</span>
               </div>
-              <div className="bg-[#FFFBF5] p-3 rounded-2xl border border-[#0F766E]/10">
-                <span className="text-[9px] font-black text-[#134E4A]/50 block uppercase">Peak Correctness</span>
-                <span className="text-lg font-black text-[#0F766E]">{highestScore}%</span>
+              <div className="bg-[#F8FAFC] p-3 rounded-2xl border border-[#4338CA]/10">
+                <span className="text-[9px] font-black text-[#312E81]/50 block uppercase">Peak Correctness</span>
+                <span className="text-lg font-black text-[#4338CA]">{highestScore}%</span>
               </div>
-              <div className="bg-[#FFFBF5] p-3 rounded-2xl border border-[#0F766E]/10">
-                <span className="text-[9px] font-black text-[#134E4A]/50 block uppercase">Average Score</span>
-                <span className="text-lg font-black text-[#0F766E]">{selectAvg}%</span>
+              <div className="bg-[#F8FAFC] p-3 rounded-2xl border border-[#4338CA]/10">
+                <span className="text-[9px] font-black text-[#312E81]/50 block uppercase">Average Score</span>
+                <span className="text-lg font-black text-[#4338CA]">{selectAvg}%</span>
               </div>
             </div>
 
-            <hr className="border-[#0F766E]/5 max-w-lg mx-auto" />
+            <hr className="border-[#4338CA]/5 max-w-lg mx-auto" />
 
             <div className="space-y-2">
-              <div className="inline-flex p-3 bg-[#E6F4F1] rounded-2xl text-[#0F766E]">
+              <div className="inline-flex p-3 bg-[#E6F4F1] rounded-2xl text-[#4338CA]">
                 <Sparkles className="w-8 h-8 shrink-0" />
               </div>
-              <h3 className="text-md font-black text-[#134E4A] uppercase tracking-wide font-sans">Interactive Practice Room</h3>
-              <p className="text-xs text-[#134E4A]/70 max-w-md mx-auto leading-relaxed font-bold">
+              <h3 className="text-md font-black text-[#312E81] uppercase tracking-wide font-sans">Interactive Practice Room</h3>
+              <p className="text-xs text-[#312E81]/70 max-w-md mx-auto leading-relaxed font-bold">
                 Convert your study summaries into active quizzes! Configure formats on the setup panel to review questions formatted in multiple choice, true/false, or typing tasks.
               </p>
             </div>
@@ -832,32 +833,32 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
 
         {/* Saved quiz history logging records */}
         {!activeQuiz && history.length > 0 && (
-          <div className="bg-white rounded-3xl border border-[#0F766E]/10 p-6">
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#0F766E]" />
-                <h3 className="text-xs font-black text-[#134E4A] uppercase tracking-wider">Evaluation History Log</h3>
+                <FileText className="w-4 h-4 text-[#4338CA]" />
+                <h3 className="text-xs font-black text-[#312E81] uppercase tracking-wider">Evaluation History Log</h3>
               </div>
-              <span className="text-[10px] text-[#134E4A]/50 font-bold">{history.length} attempts recorded</span>
+              <span className="text-[10px] text-[#312E81]/50 font-bold">{history.length} attempts recorded</span>
             </div>
 
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
               {history.map((h, i) => (
                 <div 
                   key={i} 
-                  className="flex justify-between items-center p-3 rounded-2xl bg-[#FFFBF5] border border-[#0F766E]/10 text-xs font-bold transition-all"
+                  className="flex justify-between items-center p-3 rounded-2xl bg-[#F8FAFC] border border-[#4338CA]/10 text-xs font-bold transition-all"
                   onMouseEnter={() => handleMouseEnterText(`Quiz score is ${h.percentage} percent for ${h.title}`)}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 bg-[#14B8A6]/10 text-[#0F766E] rounded-lg shrink-0">
+                    <div className="p-1.5 bg-[#6366F1]/10 text-[#4338CA] rounded-lg shrink-0">
                       <Award className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <span className="text-xs font-black text-[#134E4A] block truncate max-w-xs lg:max-w-md leading-tight">{h.title}</span>
-                      <span className="text-[9px] text-[#134E4A]/50 block font-semibold">{new Date(h.completedAt).toLocaleDateString()} at {new Date(h.completedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                      <span className="text-xs font-black text-[#312E81] block truncate max-w-xs lg:max-w-md leading-tight">{h.title}</span>
+                      <span className="text-[9px] text-[#312E81]/50 block font-semibold">{new Date(h.completedAt).toLocaleDateString()} at {new Date(h.completedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black bg-[#14B8A6]/15 px-3 py-1 text-[#0F766E] rounded-xl shrink-0">
+                  <span className="text-[10px] font-black bg-[#6366F1]/15 px-3 py-1 text-[#4338CA] rounded-xl shrink-0">
                     {h.score} / {h.totalQuestions} ({h.percentage}%)
                   </span>
                 </div>

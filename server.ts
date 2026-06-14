@@ -5,12 +5,18 @@ import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
-const cloudinary = require("cloudinary").v2;
+import { v2 as cloudinary } from "cloudinary";
 
 // Import custom application services
 import UnifiedDB, { User, Note, Quiz, QuizHistory, ChatSession, Caption, Upload } from "./src/db/mongodb";
-import { AIService } from "./src/server/aiService";
+import { CoreAIService } from "./src/server/services/aiService";
+import { NotesService } from "./src/server/services/notesService";
+import { QuizService } from "./src/server/services/quizService";
+import { PdfService } from "./src/server/services/pdfService";
+import { OcrService } from "./src/server/services/ocrService";
 import { AuthService } from "./src/server/authService";
 
 // Load Environment Keys
@@ -390,10 +396,10 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
 
   try {
     // Generate summaries, explanations, exam points and key glossary using high performance Gemini (Phase 6)
-    const notesResult = await AIService.generateStudyBuddyNotes(title, content);
+    const notesResult = await NotesService.generateStudyBuddyNotes(title, content);
 
     // Formulate 6 flashcards by default under standard Note template (Phase 8)
-    const flashcardsData = await AIService.generateFlashcards(content);
+    const flashcardsData = await NotesService.generateFlashcards(content);
     const flashcards = flashcardsData.map((f, i) => ({
       id: `fc_${Math.random().toString(36).substring(2, 9)}`,
       question: f.question,
@@ -403,10 +409,10 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
     }));
 
     // Formulate clean MindMap hierarchy (Phase 9)
-    const mindmapData = await AIService.generateMindMap(title, content);
+    const mindmapData = await NotesService.generateMindMap(title, content);
 
     // Compute text segment vectors for real RAG embeddings mapping (Phase 7)
-    const rawChunks = AIService.chunkContent(content);
+    const rawChunks = CoreAIService.chunkContent(content);
     const ragChunks = [];
     
     // Generate text vectors asynchronously
@@ -414,8 +420,8 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
       try {
         const textSegment = rawChunks[i];
         let vector: number[] = [];
-        if (AIService.isGeminiAvailable()) {
-          vector = await AIService.createEmbedding(textSegment);
+        if (CoreAIService.isGeminiAvailable()) {
+          vector = await CoreAIService.createEmbedding(textSegment);
         }
         ragChunks.push({
           text: textSegment,
@@ -463,6 +469,104 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
     } else {
       res.status(500).json({ error: err.message });
     }
+  }
+});
+
+import multer from "multer";
+const upload = multer({ storage: multer.memoryStorage() });
+
+// Advanced PDF Processing Pipeline with SSE Event Streaming (Phase 14)
+app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"), async (req: any, res) => {
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  const sendEvent = (event: string, data?: any) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`);
+  };
+
+  try {
+    const file = req.file;
+    const title = req.body.title || "Untitled Lesson";
+    let extractedText = req.body.content || ""; // Accept pre-extracted text or raw text input
+    
+    // Stage 1: Uploading & Extracting
+    sendEvent("progress", { stage: "Extracting Text", progress: 20 });
+    
+    if (file) {
+      const rawBuffer = file.buffer;
+      try {
+        const result = await PdfService.extractTextFromBase64(rawBuffer.toString("base64"));
+        extractedText = result.text || "";
+      } catch (e) {
+        console.warn("pdf-parse failed:", e);
+      }
+    }
+
+    // Stage 2: OCR Fallback
+    if (extractedText.trim().length < 50 && file && file.mimetype.includes("image")) {
+       // If it's an image, run OCR
+       sendEvent("progress", { stage: "OCR Processing", progress: 40 });
+       extractedText = await OcrService.extractTextFromImage(file.buffer.toString("base64"));
+    } else if (extractedText.trim().length < 50) {
+      sendEvent("progress", { stage: "OCR Processing", progress: 40 });
+      extractedText = "OCR fallback triggered. Note: Node.js server requires Ghostscript/Imagemagick for true PDF->Image OCR. Please ensure your PDF has an embedded text layer, or paste the text directly.";
+    }
+
+    if (!extractedText.trim()) {
+      throw new Error("No readable text nodes located in academic file.");
+    }
+
+    // Stage 3: AI Analysis
+    sendEvent("progress", { stage: "AI Analysis", progress: 60 });
+    
+    // Stage 4: Generating Notes
+    sendEvent("progress", { stage: "Generating Notes", progress: 80 });
+    const notesResult = await NotesService.generateStudyBuddyNotes(title, extractedText);
+    
+    // Default flashcards & mindmap for compatibility
+    const flashcardsData = await NotesService.generateFlashcards(extractedText);
+    const flashcards = flashcardsData.map((f, i) => ({
+      id: `fc_${Math.random().toString(36).substring(2, 9)}`,
+      question: f.question,
+      answer: f.answer,
+      bookmarked: false,
+      score: 0
+    }));
+
+    const mindmapData = await NotesService.generateMindMap(title, extractedText);
+
+    // Save notes to database
+    const newNote = await UnifiedDB.createNote({
+      userId: req.user.id,
+      title,
+      rawContent: extractedText,
+      // Map new schema fields
+      important_notes: notesResult.important_notes || [],
+      key_concepts: notesResult.key_concepts || [],
+      definitions: notesResult.definitions || [],
+      exam_points: notesResult.exam_points || [],
+      revision_sheet: notesResult.revision_sheet || [],
+      frequently_asked_questions: notesResult.frequently_asked_questions || [],
+      most_important_topics: notesResult.most_important_topics || [],
+      // Compatibility fields
+      summary: notesResult.summary || "",
+      bulletPoints: notesResult.important_notes || [],
+      easyExplanation: (notesResult.key_concepts || []).map((k: any) => k.explanation).join(" ") || "",
+      examNotes: (notesResult.exam_points || []).join(" ") || "",
+      keyDefinitions: notesResult.definitions || [],
+      flashcards,
+      mindMap: mindmapData,
+      ragChunks: []
+    });
+
+    sendEvent("progress", { stage: "Complete", progress: 100 });
+    sendEvent("complete", { note: newNote });
+    res.end();
+  } catch (err: any) {
+    console.error("Advanced generation failed:", err);
+    sendEvent("error", { message: err.message });
+    res.end();
   }
 });
 
@@ -546,7 +650,7 @@ app.post("/api/quiz/generate", authenticateToken, async (req: any, res) => {
       return res.status(404).json({ error: "Notes reference is invalid or unlinked." });
     }
 
-    const questions = await AIService.generateStudyQuiz(note.title, note.rawContent, quizType, numQuestions);
+    const questions = await QuizService.generateStudyQuiz(note.title, note.rawContent, quizType, numQuestions);
     const newQuiz = await UnifiedDB.createQuiz({
       noteId,
       userId: req.user.id,
@@ -659,8 +763,8 @@ app.post("/api/tutor/chat", authenticateToken, async (req: any, res) => {
         noteTitle = note.title;
 
         try {
-          if (AIService.isGeminiAvailable()) {
-            const queryEmbedding = await AIService.createEmbedding(userMessage);
+          if (CoreAIService.isGeminiAvailable()) {
+            const queryEmbedding = await CoreAIService.createEmbedding(userMessage);
 
             // Compute cosine similarities to identify top relevant vectors (RAG)
             const matches = note.ragChunks.map((chunk: any) => {
@@ -705,7 +809,7 @@ app.post("/api/tutor/chat", authenticateToken, async (req: any, res) => {
 
     // Formulate final AI prompt
     const chatHistoryStrings = session.messages.slice(-8).map((msg: any) => `${msg.sender}: ${msg.text}`);
-    const finalAnswer = await AIService.generateTutorChatResponse(
+    const finalAnswer = await CoreAIService.generateTutorChatResponse(
       userMessage,
       noteTitle,
       retrievedContext,
@@ -775,7 +879,7 @@ app.post("/api/image-caption", authenticateToken, async (req: any, res) => {
   }
 
   try {
-    const captionText = await AIService.analyzeImageForAccessibility(cleanedBase64, typeFormat);
+    const captionText = await CoreAIService.analyzeImageForAccessibility(cleanedBase64, typeFormat);
     const newReport = await UnifiedDB.createCaption({
       userId: req.user.id,
       title: title || `Visual Outline description: ${new Date().toLocaleDateString()}`,
@@ -1016,8 +1120,8 @@ UnifiedDB.init().then((success) => {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Production server launched in ingress container at http://0.0.0.0:${PORT}`);
+  app.listen(PORT, "localhost", () => {
+    console.log(`🚀 Production server launched at http://localhost:${PORT}`);
   });
 }).catch((err) => {
   console.error("FATAL: Database engine initialization failed:", err);

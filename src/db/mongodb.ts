@@ -76,6 +76,13 @@ export interface INote extends Document {
   easyExplanation: string;
   examNotes: string;
   keyDefinitions: Array<{ term: string; definition: string }>;
+  important_notes?: string[];
+  key_concepts?: Array<{ concept: string; explanation: string }>;
+  definitions?: Array<{ term: string; definition: string }>;
+  exam_points?: string[];
+  revision_sheet?: string[];
+  frequently_asked_questions?: Array<{ question: string; answer: string }>;
+  most_important_topics?: Array<{ topic: string; rank: number }>;
   flashcards: IFlashcard[];
   mindMap?: IMindMapNode;
   ragChunks: IRagChunk[];
@@ -91,6 +98,13 @@ const NoteSchema = new Schema<INote>({
   easyExplanation: { type: String, default: "" },
   examNotes: { type: String, default: "" },
   keyDefinitions: [{ term: String, definition: String }],
+  important_notes: [{ type: String }],
+  key_concepts: [{ concept: String, explanation: String }],
+  definitions: [{ term: String, definition: String }],
+  exam_points: [{ type: String }],
+  revision_sheet: [{ type: String }],
+  frequently_asked_questions: [{ question: String, answer: String }],
+  most_important_topics: [{ topic: String, rank: Number }],
   flashcards: [{
     id: String,
     question: String,
@@ -116,7 +130,7 @@ const NoteSchema = new Schema<INote>({
 export interface IQuizQuestion {
   id: string;
   question: string;
-  type: "mcq" | "boolean" | "short";
+  type: "mcq" | "boolean" | "short" | "fill_in_blank";
   options: string[];
   correctAnswer: string;
   explanation: string;
@@ -137,7 +151,7 @@ const QuizSchema = new Schema<IQuiz>({
   questions: [{
     id: String,
     question: String,
-    type: { type: String, enum: ["mcq", "boolean", "short"] },
+    type: { type: String, enum: ["mcq", "boolean", "short", "fill_in_blank"] },
     options: [String],
     correctAnswer: String,
     explanation: String
@@ -268,6 +282,10 @@ class UnifiedDB {
 
   private static loadLocalJSON(): any {
     if (!fs.existsSync(DB_FILE)) {
+      const dir = path.dirname(DB_FILE);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
       const fresh = { users: [], notes: [], quizzes: [], quizHistory: [], chatSessions: [], captions: [], uploads: [] };
       fs.writeFileSync(DB_FILE, JSON.stringify(fresh, null, 2));
       return fresh;

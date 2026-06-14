@@ -68,7 +68,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       const doc = new jsPDF();
       
       // Header branding bar
-      doc.setFillColor(15, 118, 110); // #0F766E
+      doc.setFillColor(15, 118, 110); // #4338CA
       doc.rect(0, 0, 210, 42, "F");
       
       doc.setFont("helvetica", "bold");
@@ -94,8 +94,8 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       doc.setFontSize(11);
       doc.setTextColor(51, 65, 85);
       
-      const studentName = user?.fullName || "Active Student Guest";
-      const studentEmail = user?.email || "student@example.com";
+      const studentName = user?.fullName || "Aayushi";
+      const studentEmail = user?.email || "aayushi@example.com";
       
       doc.text(`Name: ${studentName}`, 15, y);
       doc.text(`Account Email: ${studentEmail}`, 110, y);
@@ -244,7 +244,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       doc.setTextColor(148, 163, 184);
       doc.text("Designed with modern accessible pedagogy guidelines. Study Buddy Multi-Sensory Hub © 2026", 105, 285, { align: "center" });
       
-      doc.save(`study_buddy_report_${new Date().toISOString().split("T")[0]}.pdf`);
+      doc.save(`aayushi_report.pdf`);
       SpeechEngine.speak("A personalized progress report has been successfully generated and compiled into a PDF. Your download is complete.", voicePref);
     } catch (e) {
       console.error("PDF download failure:", e);
@@ -277,7 +277,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       
       {/* Overview Card */}
       <section 
-        className="relative bg-linear-to-r from-[#0F766E] to-[#14B8A6] rounded-3xl p-8 text-white overflow-hidden shadow-xs border border-[#0F766E]"
+        className="relative bg-linear-to-r from-[#4338CA] to-[#6366F1] rounded-3xl p-8 text-white overflow-hidden shadow-xs border border-[#4338CA]"
         onMouseEnter={() => handleMouseEnterCard("Dashboard Greeting Box", "Welcome back study buddy! Ready to achieve academic excellence scale today?")}
       >
         <div className="relative z-10 space-y-3">
@@ -295,7 +295,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
             <button
               id="dash-btn-quick-notes"
               onClick={() => onChangeTab("notes")}
-              className="bg-white text-[#0F766E] px-5 py-2.5 rounded-xl text-sm font-bold shadow-xs hover:bg-[#FFFBF5] transition-all cursor-pointer flex items-center gap-2"
+              className="bg-white text-[#4338CA] px-5 py-2.5 rounded-xl text-sm font-bold shadow-xs hover:bg-[#F8FAFC] transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               Generate New Notes <ChevronRight className="w-4 h-4" />
             </button>
@@ -303,7 +303,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
               id="dash-btn-download-report"
               disabled={isGeneratingPdf}
               onClick={handleDownloadReport}
-              className="bg-[#115E59] hover:bg-[#134E4A] text-white border border-white/20 px-5 py-2.5 rounded-xl text-sm font-bold shadow-xs hover:shadow-md transition-all cursor-pointer flex items-center gap-2"
+              className="bg-[#115E59] hover:bg-[#312E81] text-white border border-white/20 px-5 py-2.5 rounded-xl text-sm font-bold shadow-xs hover:shadow-md transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               <FileText className="w-4 h-4 text-[#2DD4BF]" />
               {isGeneratingPdf ? "Building PDF..." : "Download Report"}
@@ -323,14 +323,14 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           id="dash-widget-notes"
           onClick={() => onChangeTab("notes")}
           onMouseEnter={() => handleMouseEnterCard("Total Study Summaries Created", `${notesCountVal} note files generated.`)}
-          className="bg-white p-6 rounded-2xl border border-[#0F766E]/10 cursor-pointer hover:border-[#0F766E]/40 transition-all shadow-xs flex items-center gap-4 group"
+          className="card-soft p-6 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-4 group"
         >
-          <div className="p-4 bg-[#0F766E]/10 text-[#0F766E] rounded-xl group-hover:bg-[#0F766E] group-hover:text-white transition-all">
+          <div className="p-4 bg-[#4338CA]/10 text-[#4338CA] rounded-xl group-hover:bg-[#4338CA] group-hover:text-white transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
             <BookOpen className="w-7 h-7" />
           </div>
           <div>
-            <span className="text-xs font-bold text-[#134E4A]/60 block uppercase tracking-wider">Total Notes</span>
-            <div className="text-3xl font-black text-[#134E4A] mt-0.5">{notesCountVal}</div>
+            <span className="text-xs font-bold text-[#312E81]/60 block uppercase tracking-wider">Total Notes</span>
+            <div className="text-3xl font-black text-[#312E81] mt-0.5">{notesCountVal}</div>
           </div>
         </div>
 
@@ -339,14 +339,14 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           id="dash-widget-quizzes"
           onClick={() => onChangeTab("quiz")}
           onMouseEnter={() => handleMouseEnterCard("Quizzes Completed", `${quizCountVal} practice tests taken.`)}
-          className="bg-white p-6 rounded-2xl border border-[#0F766E]/10 cursor-pointer hover:border-[#0F766E]/40 transition-all shadow-xs flex items-center gap-4 group"
+          className="card-soft p-6 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-4 group"
         >
-          <div className="p-4 bg-teal-100 text-[#0f766e] rounded-xl group-hover:bg-[#14B8A6] group-hover:text-white transition-all">
+          <div className="p-4 bg-indigo-100 text-[#4338CA] rounded-xl group-hover:bg-[#6366F1] group-hover:text-white transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
             <Brain className="w-7 h-7" />
           </div>
           <div>
-            <span className="text-xs font-bold text-[#134E4A]/60 block uppercase tracking-wider">Quizzes Taken</span>
-            <div className="text-3xl font-black text-[#134E4A] mt-0.5">{quizCountVal}</div>
+            <span className="text-xs font-bold text-[#312E81]/60 block uppercase tracking-wider">Quizzes Taken</span>
+            <div className="text-3xl font-black text-[#312E81] mt-0.5">{quizCountVal}</div>
           </div>
         </div>
 
@@ -355,14 +355,14 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           id="dash-widget-hours"
           onClick={() => onChangeTab("profile")}
           onMouseEnter={() => handleMouseEnterCard("Accumulated Study Hours", `${studyHoursVal} hours completed.`)}
-          className="bg-white p-6 rounded-2xl border border-[#0F766E]/10 cursor-pointer hover:border-[#0F766E]/40 transition-all shadow-xs flex items-center gap-4 group"
+          className="card-soft p-6 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-4 group"
         >
-          <div className="p-4 bg-yellow-50 text-yellow-700 rounded-xl group-hover:bg-yellow-500 group-hover:text-white transition-all">
+          <div className="p-4 bg-yellow-50 text-yellow-700 rounded-xl group-hover:bg-yellow-500 group-hover:text-white transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
             <Clock className="w-7 h-7" />
           </div>
           <div>
-            <span className="text-xs font-bold text-[#134E4A]/60 block uppercase tracking-wider">Study Hours</span>
-            <div className="text-3xl font-black text-[#134E4A] mt-0.5">{studyHoursVal.toFixed(1)} hrs</div>
+            <span className="text-xs font-bold text-[#312E81]/60 block uppercase tracking-wider">Study Hours</span>
+            <div className="text-3xl font-black text-[#312E81] mt-0.5">{studyHoursVal.toFixed(1)} hrs</div>
           </div>
         </div>
 
@@ -371,14 +371,14 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           id="dash-widget-score"
           onClick={() => onChangeTab("quiz")}
           onMouseEnter={() => handleMouseEnterCard("Average Quiz Score", `${averageScoreVal} percent.`)}
-          className="bg-white p-6 rounded-2xl border border-[#0F766E]/10 cursor-pointer hover:border-[#0F766E]/40 transition-all shadow-xs flex items-center gap-4 group"
+          className="card-soft p-6 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-4 group"
         >
-          <div className="p-4 bg-emerald-50 text-emerald-700 rounded-xl group-hover:bg-emerald-600 group-hover:text-white transition-all">
+          <div className="p-4 bg-indigo-50 text-indigo-700 rounded-xl group-hover:bg-indigo-600 group-hover:text-white transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
             <Award className="w-7 h-7" />
           </div>
           <div>
-            <span className="text-xs font-bold text-[#134E4A]/60 block uppercase tracking-wider">Avg Quiz Grade</span>
-            <div className="text-3xl font-black text-[#134E4A] mt-0.5">{averageScoreVal}%</div>
+            <span className="text-xs font-bold text-[#312E81]/60 block uppercase tracking-wider">Avg Quiz Grade</span>
+            <div className="text-3xl font-black text-[#312E81] mt-0.5">{averageScoreVal}%</div>
           </div>
         </div>
 
@@ -392,15 +392,15 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           
           {/* SVG Study Progress Chart */}
           <div 
-            className="bg-white p-6 rounded-3xl border border-[#0F766E]/10"
+            className="card-soft p-6 rounded-3xl"
             onMouseEnter={() => handleMouseEnterCard("Weekly study activity chart", "Showing daily study logs recorded on the application.")}
           >
-            <h3 className="text-lg font-extrabold text-[#134E4A] mb-1">Study Logs Progress</h3>
-            <p className="text-xs text-[#134E4A]/60 mb-6">Daily minutes recorded during summary conversion and quiz exercises</p>
+            <h3 className="text-lg font-extrabold text-[#312E81] mb-1">Study Logs Progress</h3>
+            <p className="text-xs text-[#312E81]/60 mb-6">Daily minutes recorded during summary conversion and quiz exercises</p>
             
             {/* Simple responsive SVG line chart representation of progress */}
             <div className="relative h-64 w-full">
-              <svg viewBox="0 0 500 230" className="w-full h-full text-[#14B8A6]">
+              <svg viewBox="0 0 500 230" className="w-full h-full text-[#6366F1]">
                 {/* Grid Lines */}
                 <line x1="40" y1="20" x2="480" y2="20" stroke="#f1f5f9" strokeWidth="1" />
                 <line x1="40" y1="80" x2="480" y2="80" stroke="#f1f5f9" strokeWidth="1" />
@@ -411,58 +411,58 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                 <path
                   d="M 60 180 L 130 140 L 205 160 L 280 80 L 350 110 L 420 40 L 470 60"
                   fill="none"
-                  stroke="#0F766E"
+                  stroke="#4338CA"
                   strokeWidth="4"
                   strokeLinecap="round"
                 />
 
                 {/* Data points circles */}
-                <circle cx="60" cy="180" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="130" cy="140" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="205" cy="160" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="280" cy="80" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="350" cy="110" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="420" cy="40" r="5" fill="#0F766E" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="470" cy="60" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="60" cy="180" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="130" cy="140" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="205" cy="160" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="280" cy="80" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="350" cy="110" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="420" cy="40" r="5" fill="#4338CA" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="470" cy="60" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
 
                 {/* Labels */}
-                <text x="60" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Mon</text>
-                <text x="130" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Tue</text>
-                <text x="205" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Wed</text>
-                <text x="280" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Thu</text>
-                <text x="350" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Fri</text>
-                <text x="420" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Sat</text>
-                <text x="470" y="210" fontSize="10" fill="#134E4A" textAnchor="middle" fontWeight="bold">Sun</text>
+                <text x="60" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Mon</text>
+                <text x="130" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Tue</text>
+                <text x="205" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Wed</text>
+                <text x="280" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Thu</text>
+                <text x="350" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Fri</text>
+                <text x="420" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Sat</text>
+                <text x="470" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Sun</text>
 
-                <text x="25" y="25" fontSize="10" fill="#134E4A" textAnchor="end">60m</text>
-                <text x="25" y="85" fontSize="10" fill="#134E4A" textAnchor="end">40m</text>
-                <text x="25" y="145" fontSize="10" fill="#134E4A" textAnchor="end">20m</text>
-                <text x="25" y="195" fontSize="10" fill="#134E4A" textAnchor="end">0m</text>
+                <text x="25" y="25" fontSize="10" fill="#312E81" textAnchor="end">60m</text>
+                <text x="25" y="85" fontSize="10" fill="#312E81" textAnchor="end">40m</text>
+                <text x="25" y="145" fontSize="10" fill="#312E81" textAnchor="end">20m</text>
+                <text x="25" y="195" fontSize="10" fill="#312E81" textAnchor="end">0m</text>
               </svg>
             </div>
           </div>
 
           {/* SVG Recent Quiz Activity Scoreboard */}
           <div 
-            className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 flex flex-col justify-between"
+            className="card-soft p-6 rounded-3xl flex flex-col justify-between"
             onMouseEnter={() => handleMouseEnterCard("Practice Exam score list", "Depicts recent quiz evaluation percentages.")}
           >
             <div>
-              <h3 className="text-lg font-extrabold text-[#134E4A] mb-1">Recent Quiz Scores</h3>
-              <p className="text-xs text-[#134E4A]/60 mb-6 font-semibold">Track historical grades of auto quiz questionnaires</p>
+              <h3 className="text-lg font-extrabold text-[#312E81] mb-1">Recent Quiz Scores</h3>
+              <p className="text-xs text-[#312E81]/60 mb-6 font-semibold">Track historical grades of auto quiz questionnaires</p>
             </div>
 
             <div className="space-y-4">
               {stats?.recentScores && stats.recentScores.length > 0 ? (
                 stats.recentScores.map((quiz, idx) => (
                   <div key={idx} className="space-y-1.5">
-                    <div className="flex justify-between text-xs font-bold text-[#134E4A]">
+                    <div className="flex justify-between text-xs font-bold text-[#312E81]">
                       <span className="truncate">{quiz.name}</span>
                       <span>{quiz.score}%</span>
                     </div>
-                    <div className="w-full h-3 bg-[#FFFBF5] rounded-full overflow-hidden border border-[#0F766E]/5">
+                    <div className="w-full h-3 bg-[#F8FAFC] rounded-full overflow-hidden border border-[#4338CA]/5">
                       <div 
-                        className="bg-linear-to-r from-[#0F766E] to-[#14B8A6] h-full rounded-full" 
+                        className="bg-linear-to-r from-[#4338CA] to-[#6366F1] h-full rounded-full" 
                         style={{ width: `${quiz.score}%` }} 
                       />
                     </div>
@@ -470,12 +470,12 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                 ))
               ) : (
                 <div className="text-center py-8">
-                  <Brain className="w-12 h-12 text-[#134E4A]/20 mx-auto mb-2" />
-                  <p className="text-xs text-[#134E4A]/60 font-semibold">No quiz scores recorded on database files yet.</p>
+                  <Brain className="w-12 h-12 text-[#312E81]/20 mx-auto mb-2" />
+                  <p className="text-xs text-[#312E81]/60 font-semibold">No quiz scores recorded on database files yet.</p>
                   <button
                     id="dash-btn-take-quiz"
                     onClick={() => onChangeTab("quiz")}
-                    className="mt-3 text-xs bg-[#0F766E] text-white px-4 py-2 rounded-lg font-bold cursor-pointer"
+                    className="mt-3 text-xs bg-[#4338CA] text-white px-4 py-2 rounded-lg font-bold cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
                   >
                     Go to Quiz Center
                   </button>
@@ -487,13 +487,13 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
         </div>
 
         {/* Right column widget for gamified Hall of Fame: Quiz Leaderboard */}
-        <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 flex flex-col justify-between shadow-xs">
+        <div className="card-soft p-6 rounded-3xl flex flex-col justify-between shadow-xs">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <Trophy className="w-5 h-5 text-amber-500 animate-pulse" />
-              <h3 className="text-lg font-extrabold text-[#134E4A]">Quiz Leaderboard</h3>
+              <h3 className="text-lg font-extrabold text-[#312E81]">Quiz Leaderboard</h3>
             </div>
-            <p className="text-xs text-[#134E4A]/60 mb-5 font-semibold">Top student scores in global evaluation metrics</p>
+            <p className="text-xs text-[#312E81]/60 mb-5 font-semibold">Top student scores in global evaluation metrics</p>
 
             {loadingLeaderboard ? (
               <div className="space-y-3.5 py-4">
@@ -523,8 +523,8 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                       }}
                       className={`flex items-center justify-between p-2.5 rounded-xl border transition-all cursor-pointer ${
                         isCurUser
-                          ? "bg-teal-50/70 border-teal-300 shadow-xs"
-                          : "border-slate-50 hover:bg-[#FFFBF5]/60 hover:border-teal-500/20"
+                          ? "bg-indigo-50/70 border-indigo-300 shadow-xs"
+                          : "border-slate-50 hover:bg-[#F8FAFC]/60 hover:border-indigo-500/20"
                       }`}
                     >
                       <div className="flex items-center gap-3 min-w-0">
@@ -541,11 +541,11 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                         {/* Student Name and stats */}
                         <div className="truncate">
                           <span className={`text-xs font-bold block truncate ${
-                            isCurUser ? "text-teal-900 font-extrabold" : "text-[#134E4A]"
+                            isCurUser ? "text-indigo-900 font-extrabold" : "text-[#312E81]"
                           }`}>
                             {student.fullName}
                             {isCurUser && (
-                              <span className="ml-1.5 bg-teal-600 text-white font-black text-[8px] px-1.5 py-0.2 rounded-full uppercase">
+                              <span className="ml-1.5 bg-indigo-600 text-white font-black text-[8px] px-1.5 py-0.2 rounded-full uppercase">
                                 You
                               </span>
                             )}
@@ -558,8 +558,8 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
 
                       {/* Average Score Badge */}
                       <div className="text-right shrink-0">
-                        <span className="inline-flex items-center gap-0.5 bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg text-xs font-black border border-emerald-100">
-                          <Star className="w-3 h-3 fill-emerald-500 text-emerald-500 shrink-0" />
+                        <span className="inline-flex items-center gap-0.5 bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-lg text-xs font-black border border-indigo-100">
+                          <Star className="w-3 h-3 fill-indigo-500 text-indigo-500 shrink-0" />
                           <span>{student.averageScore}%</span>
                         </span>
                       </div>
@@ -576,9 +576,9 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           </div>
 
           {/* Gamified motivation message cards */}
-          <div className="bg-[#E6F4F1]/30 border border-[#0F766E]/5 rounded-2xl p-3.5 mt-4">
-            <span className="text-[10px] font-extrabold text-[#0F766E] uppercase tracking-wider block mb-1">👑 Learn Gamification Hall</span>
-            <p className="text-[11px] text-[#134E4A]/80 font-semibold leading-relaxed">
+          <div className="bg-[#E6F4F1]/30 border border-[#4338CA]/5 rounded-2xl p-3.5 mt-4">
+            <span className="text-[10px] font-extrabold text-[#4338CA] uppercase tracking-wider block mb-1">👑 Learn Gamification Hall</span>
+            <p className="text-[11px] text-[#312E81]/80 font-semibold leading-relaxed">
               Achieve higher custom test percentages in your active study modules to rank top in the academic workspace hall-of-fame challenge!
             </p>
           </div>

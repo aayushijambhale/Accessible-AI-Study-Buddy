@@ -1,0 +1,39 @@
+{
+  "users": [
+    {
+      "_id": "fmf8gyb80",
+      "id": "si9juj0tm",
+      "email": "aayushiadmin@gmail.com",
+      "passwordHash": "$2b$12$BTBhUL4ICKNORftCVtoj7usBN2h2gz76MzonBctAm4hyTEIMY1QlS",
+      "fullName": "Aayushi",
+      "studyHours": 0,
+      "studyLogs": [
+        {
+          "date": "2026-06-13",
+          "minutes": 10
+        }
+      ],
+      "refreshTokens": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTM2MTAxMywiZXhwIjoxNzgxOTY1ODEzfQ.0f1CkBPqB7cVOqZVUl-L4bfx5QwPvXtWq9XgzAfgPFo",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTM2MjIyMywiZXhwIjoxNzgxOTY3MDIzfQ.NLy3jN8wLMCEF4JuYiK-IRXDdncCjYwZAGv5FUW_iWo",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTM2NzY0NSwiZXhwIjoxNzgxOTcyNDQ1fQ.w8VpG8mgpcIZQcEPGnDuMmzdKoV75g5uv0TDo8FQZZ0"
+      ],
+      "createdAt": "2026-06-13T14:30:13.644Z",
+      "updatedAt": "2026-06-13T16:20:45.472Z",
+      "voiceSettings": {
+        "enabled": false,
+        "rate": 1,
+        "pitch": 1,
+        "voiceName": "",
+        "contrastMode": false,
+        "textZoom": "normal"
+      }
+    }
+  ],
+  "notes": [],
+  "quizzes": [],
+  "quizHistory": [],
+  "chatSessions": [],
+  "captions": [],
+  "uploads": []
+}

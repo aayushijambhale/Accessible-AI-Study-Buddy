@@ -139,7 +139,7 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
       
       {/* Student Badge Card */}
       <div 
-        className="bg-gradient-to-br from-[#0F766E] to-[#14B8A6] text-white rounded-3xl p-8 relative overflow-hidden shadow-md"
+        className="bg-gradient-to-br from-[#4338CA] to-[#6366F1] text-white rounded-3xl p-8 relative overflow-hidden shadow-md"
         onMouseEnter={() => handleMouseEnterText(`Student profile page. Account for ${userProfile?.fullName}.`)}
       >
         <div className="absolute top-0 right-0 p-8 text-white/5 pointer-events-none">
@@ -166,54 +166,54 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
         
         {/* Academic statistics */}
         <div className="md:col-span-5 space-y-6">
-          <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider block border-b border-[#0F766E]/10 pb-2">
+          <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-[#312E81] uppercase tracking-wider block border-b border-[#4338CA]/10 pb-2">
               Academic Audit
             </h3>
 
             <div className="grid grid-cols-1 gap-3">
               <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
+                className="flex justify-between items-center bg-[#F8FAFC]/40 p-4 rounded-2xl border border-orange-50"
                 onMouseEnter={() => handleMouseEnterText(`Continuous study hours: ${studyHours}`)}
               >
-                <div className="flex items-center gap-2 text-[#0F766E]">
+                <div className="flex items-center gap-2 text-[#4338CA]">
                   <Clock className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Study Hours</span>
+                  <span className="text-xs font-bold text-[#312E81]/80">Study Hours</span>
                 </div>
-                <span className="text-lg font-black text-[#134E4A]">{studyHours} hrs</span>
+                <span className="text-lg font-black text-[#312E81]">{studyHours} hrs</span>
               </div>
 
               <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
+                className="flex justify-between items-center bg-[#F8FAFC]/40 p-4 rounded-2xl border border-orange-50"
                 onMouseEnter={() => handleMouseEnterText(`Total summary materials: ${totalNotes}`)}
               >
-                <div className="flex items-center gap-2 text-[#0F766E]">
+                <div className="flex items-center gap-2 text-[#4338CA]">
                   <BookOpen className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Lessons Saved</span>
+                  <span className="text-xs font-bold text-[#312E81]/80">Lessons Saved</span>
                 </div>
-                <span className="text-lg font-black text-[#134E4A]">{totalNotes} docs</span>
+                <span className="text-lg font-black text-[#312E81]">{totalNotes} docs</span>
               </div>
 
               <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
+                className="flex justify-between items-center bg-[#F8FAFC]/40 p-4 rounded-2xl border border-orange-50"
                 onMouseEnter={() => handleMouseEnterText(`Practice tests taken: ${quizzesTaken}`)}
               >
-                <div className="flex items-center gap-2 text-[#0F766E]">
+                <div className="flex items-center gap-2 text-[#4338CA]">
                   <Brain className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Quiz Completed</span>
+                  <span className="text-xs font-bold text-[#312E81]/80">Quiz Completed</span>
                 </div>
-                <span className="text-lg font-black text-[#134E4A]">{quizzesTaken} times</span>
+                <span className="text-lg font-black text-[#312E81]">{quizzesTaken} times</span>
               </div>
 
               <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
+                className="flex justify-between items-center bg-[#F8FAFC]/40 p-4 rounded-2xl border border-orange-50"
                 onMouseEnter={() => handleMouseEnterText(`Average grading grade: ${avgGrade} percent`)}
               >
-                <div className="flex items-center gap-2 text-[#0F766E]">
+                <div className="flex items-center gap-2 text-[#4338CA]">
                   <Award className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Quiz Avg score</span>
+                  <span className="text-xs font-bold text-[#312E81]/80">Quiz Avg score</span>
                 </div>
-                <span className="text-lg font-black text-[#134E4A]">{avgGrade}%</span>
+                <span className="text-lg font-black text-[#312E81]">{avgGrade}%</span>
               </div>
             </div>
           </div>
@@ -221,8 +221,8 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
 
         {/* Gamified Achievements list card */}
         <div className="md:col-span-7 space-y-6">
-          <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider block border-b border-[#0F766E]/10 pb-2">
+          <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-xs">
+            <h3 className="text-sm font-bold text-[#312E81] uppercase tracking-wider block border-b border-[#4338CA]/10 pb-2">
               Achievements Badges ({achievementsList.filter(a => a.unlocked).length} / {achievementsList.length})
             </h3>
 
@@ -233,8 +233,8 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   onMouseEnter={() => handleMouseEnterText(`${ach.title}. status: ${ach.unlocked ? "unlocked" : "locked"}. ${ach.desc}`)}
                   className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all ${
                     ach.unlocked
-                      ? "bg-[#FFFBF5]/60 border-[#14B8A6]/20 text-[#134E4A]"
-                      : "bg-gray-50/50 border-gray-100 opacity-50 text-[#134E4A]/60"
+                      ? "bg-[#F8FAFC]/60 border-[#6366F1]/20 text-[#312E81]"
+                      : "bg-gray-50/50 border-gray-100 opacity-50 text-[#312E81]/60"
                   }`}
                 >
                   <div className="text-2xl p-2.5 bg-white rounded-xl shadow-xs shrink-0 flex items-center justify-center border border-gray-100">
@@ -242,14 +242,14 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   </div>
                   <div>
                     <div className="flex items-center gap-1.5 leading-snug">
-                      <span className="text-xs font-extrabold text-[#134E4A]">{ach.title}</span>
+                      <span className="text-xs font-extrabold text-[#312E81]">{ach.title}</span>
                       {ach.unlocked && (
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
+                        <span className="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-1.5 py-0.5 rounded-full">
                           Unlocked
                         </span>
                       )}
                     </div>
-                    <p className="text-[10.5px] leading-relaxed opacity-85 text-[#134E4A]/90 mt-1 font-semibold">{ach.desc}</p>
+                    <p className="text-[10.5px] leading-relaxed opacity-85 text-[#312E81]/90 mt-1 font-semibold">{ach.desc}</p>
                   </div>
                 </div>
               ))}
@@ -260,11 +260,11 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
       </div>
 
       {/* Profile Settings Section (Phase 2 Authenticated customization form) */}
-      <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-        <div className="flex justify-between items-center border-b border-[#0F766E]/10 pb-2">
+      <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-xs">
+        <div className="flex justify-between items-center border-b border-[#4338CA]/10 pb-2">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-[#0F766E]" />
-            <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider">
+            <ShieldCheck className="w-5 h-5 text-[#4338CA]" />
+            <h3 className="text-sm font-bold text-[#312E81] uppercase tracking-wider">
               Profile Settings (Phase 2)
             </h3>
           </div>
@@ -282,14 +282,14 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
               }
               setEditMode(!editMode);
             }}
-            className="text-xs bg-[#0F766E]/10 text-[#0F766E] hover:bg-[#0F766E] hover:text-white font-bold px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
+            className="text-xs bg-[#4338CA]/10 text-[#4338CA] hover:bg-[#4338CA] hover:text-white font-bold px-3.5 py-1.5 rounded-xl transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
           >
             {editMode ? "Cancel" : "Edit Profile Info"}
           </button>
         </div>
 
         {saveSuccess && (
-          <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-center gap-2 border border-emerald-100 font-medium">
+          <div className="p-3 bg-indigo-50 text-indigo-800 text-xs rounded-xl flex items-center gap-2 border border-indigo-100 font-medium">
             <span className="font-extrabold">✓</span> Profile updated successfully and synced securely with the secure study database!
           </div>
         )}
@@ -305,7 +305,7 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label htmlFor="edit-fullName" className="text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider">
+                <label htmlFor="edit-fullName" className="text-xs font-bold text-[#312E81]/70 uppercase tracking-wider">
                   Full Name / Student Alias
                 </label>
                 <input
@@ -314,12 +314,12 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
+                  className="w-full px-4 py-2.5 text-sm bg-white border border-[#4338CA]/10 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81]"
                 />
               </div>
 
               <div className="space-y-1">
-                <label htmlFor="edit-email" className="text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider">
+                <label htmlFor="edit-email" className="text-xs font-bold text-[#312E81]/70 uppercase tracking-wider">
                   Email Address
                 </label>
                 <input
@@ -328,7 +328,7 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   required
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
+                  className="w-full px-4 py-2.5 text-sm bg-white border border-[#4338CA]/10 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81]"
                 />
               </div>
             </div>
@@ -336,16 +336,16 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
             <button
               id="profile-btn-save"
               type="submit"
-              className="px-6 py-2.5 bg-[#0F766E] hover:bg-[#134E4A] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+              className="px-6 py-2.5 bg-[#4338CA] hover:bg-[#312E81] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               Save Account Changes
             </button>
           </form>
         ) : (
           <div className="text-xs space-y-2 opacity-80">
-            <div className="flex justify-between items-center bg-[#FFFBF5]/40 p-3.5 rounded-2xl border border-orange-50">
-              <span className="font-bold text-[#134E4A]/80">Credential Verify Level</span>
-              <span className="font-extrabold text-[#0F766E]">Fully Enrolled / Verified</span>
+            <div className="flex justify-between items-center bg-[#F8FAFC]/40 p-3.5 rounded-2xl border border-orange-50">
+              <span className="font-bold text-[#312E81]/80">Credential Verify Level</span>
+              <span className="font-extrabold text-[#4338CA]">Fully Enrolled / Verified</span>
             </div>
             <p className="leading-relaxed font-semibold">Changes made to your credentials will sync and update immediately across the entire workspace, including the customized header display.</p>
           </div>
@@ -356,17 +356,17 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
       <div className="space-y-6">
         
         {/* Real-time JWT Session Metadata & Bcrypt Encryption Inspector */}
-        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-          <div className="flex justify-between items-center border-b border-[#0F766E]/10 pb-3">
+        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-xs">
+          <div className="flex justify-between items-center border-b border-[#4338CA]/10 pb-3">
             <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-[#0F766E]/10 rounded-xl text-[#0F766E]">
+              <div className="p-2 bg-[#4338CA]/10 rounded-xl text-[#4338CA]">
                 <Lock className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">
+                <h3 className="text-sm font-extrabold text-[#312E81] uppercase tracking-wider">
                   Session Token & Password Security (Phase 3)
                 </h3>
-                <span className="text-[10px] text-[#0F766E] font-bold uppercase tracking-widest">JWT Authorization & Bcrypt Shield</span>
+                <span className="text-[10px] text-[#4338CA] font-bold uppercase tracking-widest">JWT Authorization & Bcrypt Shield</span>
               </div>
             </div>
             <button
@@ -376,7 +376,7 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                 setIsJwtCardExpanded(nextVal);
                 SpeechEngine.speak(nextVal ? "Revealed cryptography session credentials." : "Cryptographic session inspector collapsed.", voicePref);
               }}
-              className="p-1 px-3 py-1 bg-[#FFFBF5] hover:bg-[#0F766E]/10 border border-[#0F766E]/15 rounded-xl text-xs font-bold text-[#0F766E] cursor-pointer"
+              className="p-1 px-3 py-1 bg-[#F8FAFC] hover:bg-[#4338CA]/10 border border-[#4338CA]/15 rounded-xl text-xs font-bold text-[#4338CA] cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               {isJwtCardExpanded ? "Hide Details" : "Inspect Credentials"}
             </button>
@@ -390,25 +390,25 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                 
                 {/* 1. Bcrypt Password Encryption Info */}
                 <div 
-                  className="bg-[#FFFBF5]/70 p-4 rounded-2xl border border-orange-50 space-y-3"
+                  className="bg-[#F8FAFC]/70 p-4 rounded-2xl border border-orange-50 space-y-3"
                   onMouseEnter={() => handleMouseEnterText("Credentials are fully protected using Blowfish cipher bcrypt signature with 10 standard salt strength rounds.")}
                 >
-                  <div className="flex items-center gap-2 text-[#0F766E]">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" />
-                    <span className="text-xs font-black uppercase text-[#134E4A]">Password Salt Shield</span>
+                  <div className="flex items-center gap-2 text-[#4338CA]">
+                    <ShieldCheck className="w-4.5 h-4.5 text-indigo-600" />
+                    <span className="text-xs font-black uppercase text-[#312E81]">Password Salt Shield</span>
                   </div>
                   <div className="space-y-2 text-xs">
                     <p className="font-semibold text-gray-700 leading-relaxed">
                       All student passwords are systematically encrypted on the backend server before disk storage.
                     </p>
                     <div className="grid grid-cols-2 gap-2 pt-1 font-bold">
-                      <div className="bg-white/60 p-2 rounded-xl text-center border border-[#0F766E]/5">
-                        <span className="text-[10px] text-[#0F766E] block uppercase">Hash Cipher</span>
-                        <span className="text-xs text-[#134E4A]">Blowfish Bcrypt</span>
+                      <div className="bg-white/60 p-2 rounded-xl text-center border border-[#4338CA]/5">
+                        <span className="text-[10px] text-[#4338CA] block uppercase">Hash Cipher</span>
+                        <span className="text-xs text-[#312E81]">Blowfish Bcrypt</span>
                       </div>
-                      <div className="bg-white/60 p-2 rounded-xl text-center border border-[#0F766E]/5">
-                        <span className="text-[10px] text-[#0F766E] block uppercase">Salt Rounds</span>
-                        <span className="text-xs text-[#134E4A]">10 Rounds</span>
+                      <div className="bg-white/60 p-2 rounded-xl text-center border border-[#4338CA]/5">
+                        <span className="text-[10px] text-[#4338CA] block uppercase">Salt Rounds</span>
+                        <span className="text-xs text-[#312E81]">10 Rounds</span>
                       </div>
                     </div>
                   </div>
@@ -416,21 +416,21 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
 
                 {/* 2. active JWT Session Life progress tracker */}
                 <div 
-                  className="bg-[#FFFBF5]/70 p-4 rounded-2xl border border-orange-50 space-y-3"
+                  className="bg-[#F8FAFC]/70 p-4 rounded-2xl border border-orange-50 space-y-3"
                   onMouseEnter={() => handleMouseEnterText("Active student session status is managed secure by cloud web tokens with a default thirty days expiration timescale.")}
                 >
-                  <div className="flex items-center gap-2 text-[#0F766E]">
+                  <div className="flex items-center gap-2 text-[#4338CA]">
                     <Key className="w-4.5 h-4.5 text-amber-600" />
-                    <span className="text-xs font-black uppercase text-[#134E4A]">JWT Authenticated life</span>
+                    <span className="text-xs font-black uppercase text-[#312E81]">JWT Authenticated life</span>
                   </div>
                   <div className="space-y-2 text-xs">
-                    <div className="flex justify-between font-bold text-[#134E4A]/80">
+                    <div className="flex justify-between font-bold text-[#312E81]/80">
                       <span>Token Lifetime Status</span>
-                      <span className="text-emerald-700">Active (30-day term)</span>
+                      <span className="text-indigo-700">Active (30-day term)</span>
                     </div>
                     {/* Visual Progress Bar */}
                     <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                      <div className="bg-emerald-600 h-full rounded-full transition-all" style={{ width: "98%" }}></div>
+                      <div className="bg-indigo-600 h-full rounded-full transition-all" style={{ width: "98%" }}></div>
                     </div>
                     <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-extrabold text-gray-500">
                       <span>Session Started</span>
@@ -444,11 +444,11 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
               {/* 3. Secure live JWT Token Payload Decrypter (No Mock data payload - parsed directly from local JWT token!) */}
               <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 space-y-3 font-mono text-[11px] border border-slate-800">
                 <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <div className="flex items-center gap-2 text-emerald-400">
+                  <div className="flex items-center gap-2 text-indigo-400">
                     <CheckCircle2 className="w-4 h-4" />
                     <span className="font-bold text-xs uppercase tracking-wider">Live Decoded JWT Payload (Client-Side Sandboxed Decoding)</span>
                   </div>
-                  <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="bg-indigo-500/10 text-indigo-400 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-indigo-500/20">
                     HMAC-SHA256 signature Verified
                   </span>
                 </div>
@@ -473,7 +473,7 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                         <div className="space-y-1">
                           <span className="text-slate-500 block uppercase font-bold text-[9px] tracking-widest">Active Client Bearer Context:</span>
                           <span className="text-sky-300 block break-all">id: "{decoded.id}"</span>
-                          <span className="text-emerald-300 block break-all">email: "{decoded.email}"</span>
+                          <span className="text-indigo-300 block break-all">email: "{decoded.email}"</span>
                         </div>
                         <div className="space-y-1">
                           <span className="text-slate-500 block uppercase font-bold text-[9px] tracking-widest font-mono">Issued timestamps:</span>
@@ -498,20 +498,20 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
         </div>
 
         {/* Dynamic Database Schema Catalog Relational Browser */}
-        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-          <div className="flex items-center gap-2.5 border-b border-[#0F766E]/10 pb-3">
-            <div className="p-2 bg-[#0F766E]/10 rounded-xl text-[#0F766E]">
+        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-xs">
+          <div className="flex items-center gap-2.5 border-b border-[#4338CA]/10 pb-3">
+            <div className="p-2 bg-[#4338CA]/10 rounded-xl text-[#4338CA]">
               <Database className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">
+              <h3 className="text-sm font-extrabold text-[#312E81] uppercase tracking-wider">
                 Relational Database Schemas Catalog (Phase 3)
               </h3>
-              <span className="text-[10px] text-[#0F766E] font-bold uppercase tracking-widest">Verified Relational Properties & Database Fields</span>
+              <span className="text-[10px] text-[#4338CA] font-bold uppercase tracking-widest">Verified Relational Properties & Database Fields</span>
             </div>
           </div>
 
-          <p className="text-xs font-semibold text-[#134E4A]/80 leading-relaxed">
+          <p className="text-xs font-semibold text-[#312E81]/80 leading-relaxed">
             The data storage framework maps to the following structured repository tables. Each record persists securely and relates chronologically back to the certified User primary key.
           </p>
 
@@ -536,8 +536,8 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   }}
                   className={`text-xs font-extrabold px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
                     isActive
-                      ? "bg-[#0F766E] text-white shadow-xs"
-                      : "bg-[#FFFBF5] text-[#0F766E] hover:bg-[#0F766E]/10 border border-[#0F766E]/10"
+                      ? "bg-[#4338CA] text-white shadow-xs"
+                      : "bg-[#F8FAFC] text-[#4338CA] hover:bg-[#4338CA]/10 border border-[#4338CA]/10"
                   }`}
                 >
                   {displayLabels[tab]}
@@ -547,7 +547,7 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
           </div>
 
           {/* Displays dynamic schema content of selected tab */}
-          <div className="p-4 bg-[#FFFBF5]/70 rounded-2xl border border-orange-50 space-y-3 animate-fadeIn">
+          <div className="p-4 bg-[#F8FAFC]/70 rounded-2xl border border-orange-50 space-y-3 animate-fadeIn">
             
             {(() => {
               const schemasInfo = {
@@ -618,27 +618,27 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
 
               return (
                 <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[#134E4A]">
-                    <Layers className="w-4 h-4 text-[#0F766E]" />
+                  <div className="flex items-center gap-2 text-[#312E81]">
+                    <Layers className="w-4 h-4 text-[#4338CA]" />
                     <h4 className="text-xs font-extrabold uppercase tracking-wider">{activeSchemaObj.title}</h4>
                   </div>
-                  <p className="text-[10.5px] text-[#134E4A]/80 font-bold mb-2 italic">
+                  <p className="text-[10.5px] text-[#312E81]/80 font-bold mb-2 italic">
                     "{activeSchemaObj.description}"
                   </p>
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-[10px] text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-[#0F766E]/20 text-[#0F766E]/80 uppercase font-black tracking-widest bg-emerald-500/5">
+                        <tr className="border-b border-[#4338CA]/20 text-[#4338CA]/80 uppercase font-black tracking-widest bg-indigo-500/5">
                           <th className="py-2.5 px-3">Field Key Name</th>
                           <th className="py-2.5 px-3">Relational Type / Format</th>
                           <th className="py-2.5 px-3">Field Usage & Safeguard Description</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-[#0F766E]/5">
+                      <tbody className="divide-y divide-[#4338CA]/5">
                         {activeSchemaObj.fields.map((field) => (
-                          <tr key={field.key} className="hover:bg-teal-50/20 font-semibold text-[#134E4A]">
-                            <td className="py-2 px-3 text-[#0F766E] font-bold font-mono">{field.key}</td>
+                          <tr key={field.key} className="hover:bg-indigo-50/20 font-semibold text-[#312E81] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
+                            <td className="py-2 px-3 text-[#4338CA] font-bold font-mono">{field.key}</td>
                             <td className="py-2 px-3 text-slate-600 font-bold text-[9px] font-mono">{field.type}</td>
                             <td className="py-2 px-3 text-[10.5px] font-bold text-gray-700 leading-normal">{field.desc}</td>
                           </tr>
