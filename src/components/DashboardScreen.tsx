@@ -3,7 +3,9 @@ import { BookOpen, Brain, Clock, Award, ChevronRight, HelpCircle, FileText, Spar
 import { SpeechEngine } from "../utils/speech";
 import { DashboardAnalytics, VoicePreferences, UserProfile } from "../types";
 import { jsPDF } from "jspdf";
-
+import { useToast } from "./ui/Toast";
+import { Skeleton } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 interface DashboardProps {
   token: string;
   onChangeTab: (tab: string) => void;
@@ -17,6 +19,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const { addToast } = useToast();
 
   useEffect(() => {
     // Fetch analytic summaries
@@ -30,6 +33,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       })
       .catch((err) => {
         console.error("Failed loading dashboard analytics", err);
+        addToast("Failed to load dashboard analytics", "error");
         setLoading(false);
       });
 
@@ -44,6 +48,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       })
       .catch((err) => {
         console.error("Failed loading leaderboard data", err);
+        addToast("Failed to load leaderboard data", "error");
         setLoadingLeaderboard(false);
       });
   }, [token]);
@@ -248,6 +253,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       SpeechEngine.speak("A personalized progress report has been successfully generated and compiled into a PDF. Your download is complete.", voicePref);
     } catch (e) {
       console.error("PDF download failure:", e);
+      addToast("Failed to generate PDF report", "error");
       SpeechEngine.speak("Apologies, an error occurred during report PDF compilation.", voicePref);
     } finally {
       setIsGeneratingPdf(false);
@@ -256,11 +262,11 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
 
   if (loading) {
     return (
-      <div className="p-8 space-y-6">
-        <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
+      <div className="p-6 space-y-8 max-w-7xl mx-auto">
+        <Skeleton className="h-48 w-full rounded-3xl" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-32 bg-slate-200 rounded-2xl animate-pulse" />
+            <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))}
         </div>
       </div>
@@ -469,17 +475,19 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8">
-                  <Brain className="w-12 h-12 text-[#312E81]/20 mx-auto mb-2" />
-                  <p className="text-xs text-[#312E81]/60 font-semibold">No quiz scores recorded on database files yet.</p>
-                  <button
-                    id="dash-btn-take-quiz"
-                    onClick={() => onChangeTab("quiz")}
-                    className="mt-3 text-xs bg-[#4338CA] text-white px-4 py-2 rounded-lg font-bold cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  >
-                    Go to Quiz Center
-                  </button>
-                </div>
+                <EmptyState
+                  icon={<Brain className="w-8 h-8" />}
+                  title="No Quizzes Yet"
+                  description="You haven't taken any quizzes yet. Generate notes and test your knowledge."
+                  action={
+                    <button
+                      onClick={() => onChangeTab("quiz")}
+                      className="btn-primary text-sm py-2 px-4 cursor-pointer"
+                    >
+                      Go to Quiz Center
+                    </button>
+                  }
+                />
               )}
             </div>
           </div>
@@ -568,10 +576,11 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                 })}
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-400">
-                <Users className="w-10 h-10 mx-auto opacity-30 mb-2" />
-                <p className="text-xs font-semibold">No students in the database leaderboard yet.</p>
-              </div>
+              <EmptyState
+                icon={<Users className="w-6 h-6" />}
+                title="Leaderboard Empty"
+                description="No students have completed quizzes yet."
+              />
             )}
           </div>
 

@@ -28,6 +28,9 @@ import {
 } from "lucide-react";
 import { SpeechEngine } from "../utils/speech";
 import { NoteItem, VoicePreferences } from "../types";
+import { useToast } from "./ui/Toast";
+import { Skeleton } from "./ui/Skeleton";
+import { EmptyState } from "./ui/EmptyState";
 
 interface NotesProps {
   token: string;
@@ -71,6 +74,8 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   // Interactive note items mastery checklist state (Phase 4 interactivity additions)
   const [masteredBullets, setMasteredBullets] = useState<Record<string, boolean>>({});
 
+  const { addToast } = useToast();
+
   // Trigger feedback hover audio
   const handleMouseEnterText = (label: string) => {
     if (voicePref.enabled) {
@@ -94,6 +99,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
       })
       .catch((err) => {
         console.error("Notes load failed", err);
+        addToast("Failed to load notes", "error");
         setLoadingList(false);
       });
   };
@@ -253,6 +259,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     } catch (err: any) {
       console.error("PDF engine failure:", err);
       setError(`Extraction failed: ${err.message}`);
+      addToast(`Extraction failed: ${err.message}`, "error");
       SpeechEngine.speak(`Error: ${err.message}`, voicePref);
     } finally {
       setIsUploadingFile(false);
@@ -271,6 +278,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
     reader.onerror = () => {
       setError("File reader failed to read standard bytes.");
+      addToast("Failed to read file", "error");
       setIsUploadingFile(false);
     };
 
@@ -479,6 +487,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
       SpeechEngine.speak(`Notes downloaded as DOCX file.`, voicePref);
     } catch (err) {
       console.error("DOCX export failed", err);
+      addToast("Failed to export DOCX", "error");
       SpeechEngine.speak("DOCX export failed.", voicePref);
     }
   };
@@ -827,7 +836,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
           {loadingList ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-10 bg-slate-100 rounded-lg animate-pulse" />
+                <Skeleton key={i} className="h-12 w-full rounded-2xl" />
               ))}
             </div>
           ) : notes.length > 0 ? (
@@ -861,10 +870,11 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
               })}
             </div>
           ) : (
-            <div className="text-center py-6 bg-slate-500/5 rounded-2xl">
-              <BookOpen className="w-8 h-8 text-[#312E81]/25 mx-auto mb-1.5" />
-              <p className="text-xs text-[#312E81]/60 font-semibold">Your study catalogue is empty.</p>
-            </div>
+            <EmptyState
+              icon={<BookOpen className="w-6 h-6" />}
+              title="No Notes"
+              description="Your study catalogue is empty."
+            />
           )}
         </div>
 
@@ -1120,12 +1130,12 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-12 text-center shadow-sm">
-            <BookOpen className="w-16 h-16 text-[#312E81]/25 mx-auto mb-4 animate-bounce" />
-            <h3 className="text-sm font-extrabold text-[#312E81] uppercase tracking-wider">No active converted unit</h3>
-            <p className="text-xs text-[#312E81]/60 max-w-sm mx-auto font-semibold leading-relaxed mt-1">
-              Select or drop an academic textbook unit file inside the left uploader panel. The generative API will synthesize a comprehensive workspace containing summaries, metaphors, practice exams, and definitions.
-            </p>
+          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-4 shadow-sm h-full flex flex-col justify-center">
+            <EmptyState
+              icon={<BookOpen className="w-12 h-12" />}
+              title="No active converted unit"
+              description="Select or drop an academic textbook unit file inside the left uploader panel. The generative API will synthesize a comprehensive workspace containing summaries, metaphors, practice exams, and definitions."
+            />
           </div>
         )}
 

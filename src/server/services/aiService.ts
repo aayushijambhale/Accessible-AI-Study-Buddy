@@ -3,18 +3,15 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Provider options from environment variables
-const AI_PROVIDER = process.env.AI_PROVIDER || "gemini"; // "gemini" | "openai" | "groq" | "openrouter"
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OLLAMA_URL = process.env.OLLAMA_URL || "http://127.0.0.1:11434"; // default ollama local URL
 
-// Initialize named Gemini API client
-let ai: GoogleGenAI | null = null;
+let geminiAi: GoogleGenAI | null = null;
 
 if (GEMINI_API_KEY) {
-  ai = new GoogleGenAI({
+  geminiAi = new GoogleGenAI({
     apiKey: GEMINI_API_KEY,
     httpOptions: {
       headers: {
@@ -26,88 +23,205 @@ if (GEMINI_API_KEY) {
   console.warn("⚠️ warning: GEMINI_API_KEY is not defined in this environment.");
 }
 
+const fetchWithTimeout = async (url: string, options: any, timeoutMs = 20000) => {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    throw err;
+  }
+};
+
 export class CoreAIService {
   public static isGeminiAvailable(): boolean {
-    return ai !== null;
+    return geminiAi !== null;
   }
 
-  public static getAIClient(): GoogleGenAI {
-    if (!ai) {
-      throw new Error("GEMINI_API_KEY_MISSING");
-    }
-    return ai;
+  public static getAIClient() {
+    if (!geminiAi) throw new Error("Gemini AI not initialized.");
+    return geminiAi;
   }
 
   /**
-   * Request retry wrapper with exponential backoff for resilience.
-   * Explicitly handles 429 Quota Exceeded and guarantees non-crash behavior.
+   * Request retry wrapper with fallback logic for resilience.
+   * Explicitly handles 429 Quota Exceeded and tries fallback providers.
    */
-  public static async callWithRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Promise<T> {
-    try {
-      return await fn();
-    } catch (error: any) {
-      if (retries <= 0) {
-        console.error("AI Service failed after maximum retries. Error:", error);
-        throw new Error(
-          JSON.stringify({
-            message: "The AI service is currently experiencing high load or quota limits. Please try again later.",
-            code: error?.status || error?.code || 500,
-            provider: AI_PROVIDER
-          })
-        );
+  public static async executeWithFallback<T>(
+    operationName: string,
+    geminiFn: () => Promise<T>,
+    openaiFn?: () => Promise<T>,
+    groqFn?: () => Promise<T>,
+    ollamaFn?: () => Promise<T>
+  ): Promise<T> {
+    const providers = [];
+    
+    if (geminiAi) providers.push({ name: "Gemini", fn: geminiFn });
+    if (OPENAI_API_KEY && openaiFn) providers.push({ name: "OpenAI", fn: openaiFn });
+    if (GROQ_API_KEY && groqFn) providers.push({ name: "Groq", fn: groqFn });
+    if (ollamaFn) providers.push({ name: "Ollama", fn: ollamaFn });
+
+    if (providers.length === 0) {
+      throw new Error("No AI providers configured or available.");
+    }
+
+    let lastError: any = null;
+
+    for (const provider of providers) {
+      try {
+        console.log(`[AI] Attempting ${operationName} with ${provider.name}...`);
+        const result = await provider.fn();
+        return result;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[AI] ${provider.name} failed for ${operationName}:`, err.message || err);
+        // We will fallback to the next provider automatically
       }
-      
-      console.warn(`AI provider call failed. Retrying in ${delay}ms... (${retries} attempts left). Error:`, error.message || error);
-      await new Promise((res) => setTimeout(res, delay));
-      return this.callWithRetry(fn, retries - 1, delay * 2);
     }
+
+    console.error("[AI] All fallback providers exhausted.");
+    throw new Error(
+      JSON.stringify({
+        message: "The AI service is currently experiencing high load or quota limits. Please try again later.",
+        code: lastError?.status || lastError?.code || 500,
+        provider: "FallbackExhausted"
+      })
+    );
   }
 
-  /**
-   * Universal provider wrapper for structured data generation
-   */
   public static async generateStructuredData(prompt: string, schemaDefinition: any): Promise<any> {
-    return this.callWithRetry(async () => {
-      // In a real multi-provider setup, we would route to OpenAI/Groq here using their respective SDKs
-      // We will default to Gemini if AI_PROVIDER is gemini, else we mock/throw unsupported for now
-      if (AI_PROVIDER !== "gemini") {
-        console.warn(`Provider ${AI_PROVIDER} is selected but not fully wired with SDKs yet. Falling back to Gemini.`);
+    return this.executeWithFallback(
+      "generateStructuredData",
+      async () => {
+        const response = await geminiAi!.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: schemaDefinition
+          }
+        });
+        return JSON.parse((response.text || "{}").trim());
+      },
+      async () => {
+        // OpenAI Fallback
+        const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: "You are a JSON generating assistant. Return valid JSON matching the schema requirements." },
+              { role: "user", content: prompt }
+            ]
+          })
+        });
+        if (!response.ok) throw new Error(`OpenAI error: ${response.statusText}`);
+        const data = await response.json();
+        return JSON.parse((data.choices[0].message.content || "{}").trim());
+      },
+      async () => {
+        // Groq Fallback
+        const response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${GROQ_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "llama-3.1-8b-instant",
+            response_format: { type: "json_object" },
+            messages: [
+              { role: "system", content: "You are a JSON generating assistant. Return valid JSON matching the schema requirements." },
+              { role: "user", content: prompt }
+            ]
+          })
+        });
+        if (!response.ok) throw new Error(`Groq error: ${response.statusText}`);
+        const data = await response.json();
+        return JSON.parse((data.choices[0].message.content || "{}").trim());
+      },
+      async () => {
+        // Ollama Fallback
+        const response = await fetchWithTimeout(`${OLLAMA_URL}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: "llama3.2",
+            format: "json",
+            prompt: prompt,
+            stream: false
+          })
+        }, 60000); // give ollama more time
+        if (!response.ok) throw new Error(`Ollama error: ${response.statusText}`);
+        const data = await response.json();
+        return JSON.parse((data.response || "{}").trim());
       }
-
-      const response = await this.getAIClient().models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: schemaDefinition
-        }
-      });
-      
-      const text = response.text || "{}";
-      return JSON.parse(text.trim());
-    });
+    );
   }
 
-  /**
-   * Universal provider wrapper for generic text generation
-   */
   public static async generateText(prompt: string, systemInstruction?: string): Promise<string> {
-    return this.callWithRetry(async () => {
-      const config: any = {};
-      if (systemInstruction) config.systemInstruction = systemInstruction;
-
-      const response = await this.getAIClient().models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: prompt,
-        config
-      });
-
-      return response.text || "Unable to formulate a response.";
-    });
+    return this.executeWithFallback(
+      "generateText",
+      async () => {
+        const config: any = {};
+        if (systemInstruction) config.systemInstruction = systemInstruction;
+        const response = await geminiAi!.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: prompt,
+          config
+        });
+        return response.text || "Unable to formulate a response.";
+      },
+      async () => {
+        const messages = [];
+        if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
+        messages.push({ role: "user", content: prompt });
+        const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+          body: JSON.stringify({ model: "gpt-4o-mini", messages })
+        });
+        if (!response.ok) throw new Error(`OpenAI error: ${response.statusText}`);
+        const data = await response.json();
+        return data.choices[0].message.content || "Unable to formulate a response.";
+      },
+      async () => {
+        const messages = [];
+        if (systemInstruction) messages.push({ role: "system", content: systemInstruction });
+        messages.push({ role: "user", content: prompt });
+        const response = await fetchWithTimeout("https://api.groq.com/openai/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${GROQ_API_KEY}` },
+          body: JSON.stringify({ model: "llama-3.3-70b-versatile", messages })
+        });
+        if (!response.ok) throw new Error(`Groq error: ${response.statusText}`);
+        const data = await response.json();
+        return data.choices[0].message.content || "Unable to formulate a response.";
+      },
+      async () => {
+        const fullPrompt = systemInstruction ? `${systemInstruction}\n\n${prompt}` : prompt;
+        const response = await fetchWithTimeout(`${OLLAMA_URL}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: "llama3.2", prompt: fullPrompt, stream: false })
+        }, 60000);
+        if (!response.ok) throw new Error(`Ollama error: ${response.statusText}`);
+        const data = await response.json();
+        return data.response || "Unable to formulate a response.";
+      }
+    );
   }
 
-  // Segment study notes into clean passages of ~500 characters for high performance RAG searches
-  public static chunkContent(text: string, size = 600): string[] {
+  // Segment study notes into clean passages of ~500 characters with an overlap for high performance RAG searches
+  public static chunkContent(text: string, size = 600, overlap = 100): string[] {
     const cleanText = text.replace(/\s+/g, " ").trim();
     const chunks: string[] = [];
     let start = 0;
@@ -117,61 +231,97 @@ export class CoreAIService {
         chunks.push(cleanText.substring(start));
         break;
       }
-      // Backtrack to find closest period or space boundary
-      let spaceIdx = cleanText.lastIndexOf(" ", end);
-      if (spaceIdx > start && spaceIdx < end + 50) {
-        chunks.push(cleanText.substring(start, spaceIdx));
-        start = spaceIdx + 1;
-      } else {
-        chunks.push(cleanText.substring(start, end));
-        start = end;
+      
+      let splitIdx = cleanText.lastIndexOf(". ", end);
+      if (splitIdx <= start + overlap) {
+        splitIdx = cleanText.lastIndexOf(" ", end);
+      }
+      if (splitIdx <= start + overlap) {
+        splitIdx = end;
+      }
+      
+      chunks.push(cleanText.substring(start, splitIdx + 1).trim());
+      start = splitIdx + 1 - overlap;
+      if (start < 0) start = 0;
+      
+      // Ensure we always advance
+      if (start >= splitIdx + 1) {
+        start = splitIdx + 1;
       }
     }
     return chunks;
   }
 
   public static async createEmbedding(textSegment: string): Promise<number[]> {
-    return this.callWithRetry(async () => {
-      const result = await this.getAIClient().models.embedContent({
-        model: "text-embedding-004",
-        contents: textSegment
-      });
-
-      const res = result as any;
-      if (res.embeddings && res.embeddings[0] && res.embeddings[0].values) {
-        return res.embeddings[0].values;
+    let retries = 3;
+    let delay = 1000;
+    while (retries > 0) {
+      try {
+        if (!geminiAi) throw new Error("Gemini AI not initialized for embeddings.");
+        const result = await geminiAi.models.embedContent({
+          model: "text-embedding-004",
+          contents: textSegment
+        });
+        const res = result as any;
+        if (res.embeddings && res.embeddings[0] && res.embeddings[0].values) {
+          return res.embeddings[0].values;
+        }
+        throw new Error("Embedded content returned blank values");
+      } catch (err: any) {
+        retries--;
+        if (retries <= 0) throw err;
+        await new Promise(r => setTimeout(r, delay));
+        delay *= 2;
       }
-      throw new Error("Embedded content returned blank values");
-    });
+    }
+    return [];
   }
 
   public static async analyzeImageForAccessibility(base64Image: string, mimeType = "image/png"): Promise<string> {
-    return this.callWithRetry(async () => {
-      const imagePart = {
-        inlineData: {
-          mimeType,
-          data: base64Image
-        }
-      };
-
-      const textPart = {
-        text: `You are an expert accessibility consultant and visual-to-audio study captioner.
+    const prompt = `You are an expert accessibility consultant and visual-to-audio study captioner.
         Describe this study image (flowchart, textbook page, formula sheet, or lecture slides) in deep, rich detail.
         
         Requirements:
         - Describe what is visually represented.
         - Transcribe ALL reading texts, formulas, calculations, numbers, or headers completely.
         - Describe colors, visual flow, structures, and charts clearly.
-        - Use clean, screen-reader friendly narrative paragraphs.`
-      };
+        - Use clean, screen-reader friendly narrative paragraphs.`;
 
-      const response = await this.getAIClient().models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: { parts: [imagePart, textPart] }
-      });
-
-      return response.text || "No description synthesized.";
-    });
+    return this.executeWithFallback(
+      "analyzeImage",
+      async () => {
+        const imagePart = { inlineData: { mimeType, data: base64Image } };
+        const textPart = { text: prompt };
+        const response = await geminiAi!.models.generateContent({
+          model: "gemini-1.5-flash",
+          contents: { parts: [imagePart, textPart] }
+        });
+        return response.text || "No description synthesized.";
+      },
+      async () => {
+        // OpenAI Vision fallback
+        const response = await fetchWithTimeout("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_API_KEY}` },
+          body: JSON.stringify({
+            model: "gpt-4o-mini",
+            messages: [
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: prompt },
+                  { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Image}` } }
+                ]
+              }
+            ]
+          })
+        });
+        if (!response.ok) throw new Error(`OpenAI Vision error: ${response.statusText}`);
+        const data = await response.json();
+        return data.choices[0].message.content || "No description synthesized.";
+      }
+      // Groq and Ollama vision may not be robustly supported yet, skipping for image analysis fallback
+    );
   }
 
   public static async generateTutorChatResponse(userMessage: string, noteTitle: string, retrievedContext: string, mode: string, conversationHistory: string[]): Promise<string> {

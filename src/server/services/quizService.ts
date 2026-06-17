@@ -10,10 +10,7 @@ export class QuizService {
         ? "Create ONLY True or False (boolean) questions, with options array containing exactly ['True', 'False']."
         : "Create a mix of MCQ, True/False, and short answer questions.";
 
-    return CoreAIService.callWithRetry(async () => {
-      const response = await CoreAIService.getAIClient().models.generateContent({
-        model: "gemini-1.5-flash",
-        contents: `Create structured study quiz questions from context:
+    const prompt = `Create structured study quiz questions from context:
         Title: "${title}"
         Text: "${content.replace(/"/g, '\\"')}"
         
@@ -30,36 +27,31 @@ export class QuizService {
               "explanation": "educational rationale details"
             }
           ]
-        }`,
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
+        }`;
+
+    const schemaDefinition = {
+      type: Type.OBJECT,
+      properties: {
+        questions: {
+          type: Type.ARRAY,
+          items: {
             type: Type.OBJECT,
             properties: {
-              questions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    id: { type: Type.STRING },
-                    question: { type: Type.STRING },
-                    type: { type: Type.STRING },
-                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    correctAnswer: { type: Type.STRING },
-                    explanation: { type: Type.STRING }
-                  },
-                  required: ["id", "question", "type", "options", "correctAnswer", "explanation"]
-                }
-              }
+              id: { type: Type.STRING },
+              question: { type: Type.STRING },
+              type: { type: Type.STRING },
+              options: { type: Type.ARRAY, items: { type: Type.STRING } },
+              correctAnswer: { type: Type.STRING },
+              explanation: { type: Type.STRING }
             },
-            required: ["questions"]
+            required: ["id", "question", "type", "options", "correctAnswer", "explanation"]
           }
         }
-      });
+      },
+      required: ["questions"]
+    };
 
-      const text = response.text || "{}";
-      const parsed = JSON.parse(text.trim());
-      return parsed.questions || [];
-    });
+    const parsed = await CoreAIService.generateStructuredData(prompt, schemaDefinition);
+    return parsed.questions || [];
   }
 }

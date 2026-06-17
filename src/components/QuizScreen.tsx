@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Brain, FileText, Play, Volume2, Timer, AlertCircle, HelpCircle, CheckCircle, XCircle, ChevronRight, Award, RefreshCw, Trophy, Sparkles, User, Hourglass } from "lucide-react";
 import { SpeechEngine } from "../utils/speech";
 import { NoteItem, QuizItem, QuizHistory, QuizQuestion, VoicePreferences } from "../types";
+import { useToast } from "./ui/Toast";
 
 interface QuizProps {
   token: string;
@@ -30,6 +31,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
   const [quizTimerActive, setQuizTimerActive] = useState(false);
   const [quizFinished, setQuizFinished] = useState(false);
   const [quizScore, setQuizScore] = useState(0);
+  const { addToast } = useToast();
 
   // Load baseline resources
   const loadResources = () => {
@@ -43,21 +45,30 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
           setSelectedNoteId(data[0].id);
         }
       })
-      .catch((err) => console.error("Error fetching notes: ", err));
+      .catch((err) => {
+        console.error("Error fetching notes: ", err);
+        addToast("Failed to fetch notes", "error");
+      });
 
     fetch("/api/quiz/history", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((data) => setHistory(data))
-      .catch((err) => console.error("Error fetching history: ", err));
+      .catch((err) => {
+        console.error("Error fetching history: ", err);
+        addToast("Failed to fetch quiz history", "error");
+      });
 
     fetch("/api/quiz/leaderboard", {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((r) => r.json())
       .then((data) => setLeaderboard(data))
-      .catch((err) => console.error("Error fetching leaderboard: ", err));
+      .catch((err) => {
+        console.error("Error fetching leaderboard: ", err);
+        addToast("Failed to fetch leaderboard", "error");
+      });
   };
 
   useEffect(() => {
@@ -151,6 +162,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
       }, 1200);
     } catch (err: any) {
       console.error(err);
+      addToast(`Could not formulate quiz: ${err.message}`, "error");
       SpeechEngine.speak(`Could not formulate quiz: ${err.message}`, voicePref);
     } finally {
       setGeneratingQuiz(false);
@@ -316,6 +328,7 @@ export default function QuizScreen({ token, voicePref }: QuizProps) {
       loadResources(); // Refresh past evaluations and rankings live
     } catch (err) {
       console.error("Failed storing score progress: ", err);
+      addToast("Failed to save score progress", "error");
     }
   };
 

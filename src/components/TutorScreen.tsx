@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Sparkles, MessageCircle, Send, Volume2, StopCircle, Mic, MicOff, AlertCircle, FileText } from "lucide-react";
+import { Sparkles, MessageCircle, Send, Volume2, StopCircle, Mic, MicOff, AlertCircle, FileText, Headphones } from "lucide-react";
 import { SpeechEngine } from "../utils/speech";
 import { NoteItem, ChatMessage, VoicePreferences } from "../types";
 
@@ -22,8 +22,11 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
   // Mic recording states
   const [isRecording, setIsRecording] = useState(false);
   const [recordingError, setRecordingError] = useState("");
+  const [isHandsFree, setIsHandsFree] = useState(false);
 
   const wasTranscribedByVoice = useRef(false);
+  const handsFreeRef = useRef(false);
+  const transcriptRef = useRef("");
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Load baseline resources
@@ -117,7 +120,11 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
 
       // Read AI Response out aloud automatically
       setTimeout(() => {
-        SpeechEngine.speak(data.aiResponse, voicePref);
+        SpeechEngine.speak(data.aiResponse, voicePref, () => {
+          if (handsFreeRef.current) {
+            handleToggleRecord(true);
+          }
+        });
       }, 200);
     } catch (err) {
       console.error(err);
@@ -139,8 +146,8 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
   };
 
   // Speech to Text audio capture (Phase 7 dynamic microphone recording)
-  const handleToggleRecord = () => {
-    if (isRecording) {
+  const handleToggleRecord = (forceStart = false) => {
+    if (isRecording && !forceStart) {
       SpeechEngine.stopListening();
       setIsRecording(false);
       return;
@@ -148,16 +155,22 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
 
     setRecordingError("");
     setIsRecording(true);
+    transcriptRef.current = "";
 
     SpeechEngine.startListening(
       (transcript) => {
         setInputVal(transcript);
+        transcriptRef.current = transcript;
         if (transcript.trim().length > 0) {
           wasTranscribedByVoice.current = true;
         }
       },
       () => {
         setIsRecording(false);
+        if (handsFreeRef.current && transcriptRef.current.trim()) {
+           handleSendMessage(transcriptRef.current);
+           transcriptRef.current = "";
+        }
       },
       (err) => {
         console.error("STT capture failure: ", err);
@@ -282,6 +295,28 @@ export default function TutorScreen({ token, voicePref, onAddVoiceLog }: TutorPr
           </div>
 
           <div className="flex gap-2">
+            <button
+              id="tutor-btn-hands-free"
+              onClick={() => {
+                const nextState = !isHandsFree;
+                setIsHandsFree(nextState);
+                handsFreeRef.current = nextState;
+                if (nextState) {
+                  SpeechEngine.speak("Hands free continuous mode activated.", voicePref, () => handleToggleRecord(true));
+                } else {
+                  SpeechEngine.stopListening();
+                }
+              }}
+              title="Toggle Hands-Free Continuous Mode"
+              className={`p-2 border rounded-xl cursor-pointer transition-all flex items-center gap-1 text-[10px] font-bold ${
+                isHandsFree 
+                  ? "bg-[#6366F1] text-white border-[#6366F1]" 
+                  : "bg-white text-[#4338CA] border-[#4338CA]/20 hover:bg-[#6366F1]/10"
+              }`}
+            >
+              <Headphones className="w-4 h-4" /> 
+              <span className="hidden sm:inline">Hands-Free</span>
+            </button>
             <button
               id="tutor-btn-stop-audio"
               onClick={() => SpeechEngine.stop()}
