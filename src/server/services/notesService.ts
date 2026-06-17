@@ -24,22 +24,24 @@ export class NotesService {
     const chunks = ChunkingService.chunkText(rawContent, 6000);
     const analysisContent = chunks.slice(0, 2).join("\n\n---\n\n");
 
-    const prompt = `You are an expert professor and educational content creator.
+    const prompt = `You are an expert professor.
 
-Analyze the study material and create:
-1. Chapter-wise Notes
-2. Key Concepts
-3. Important Definitions
-4. Important Formulas
-5. Examples
-6. One-Day Revision Notes
-7. Exam Questions
+Analyze the provided study material.
+
+Generate:
+1. Quick Summary
+2. Detailed Notes
+3. Chapter-wise Notes
+4. Important Definitions
+5. Formula Sheet
+6. Key Concepts
+7. Important Questions
 8. Viva Questions
 9. Interview Questions
 10. Flashcards
-11. Key Takeaways
+11. Revision Notes
 
-Format using markdown headings and bullet points where applicable. Make notes concise, exam-focused, and easy to revise. Do not repeat information. Focus only on high-value learning content.
+Return structured markdown where possible. Format using headings and bullet points. Make notes concise, exam-focused, and easy to revise. Do not repeat information. Focus only on high-value learning content.
 
 Study Material Title: "${title}"
 Content: "${analysisContent.replace(/"/g, '\\"')}"`;

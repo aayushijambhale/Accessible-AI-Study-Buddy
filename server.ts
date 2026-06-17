@@ -475,23 +475,19 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
 import multer from "multer";
 const upload = multer({ storage: multer.memoryStorage() });
 
-// Advanced PDF Processing Pipeline with SSE Event Streaming (Phase 14)
+// Advanced PDF Processing Pipeline (Standardized JSON)
 app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"), async (req: any, res) => {
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-
-  const sendEvent = (event: string, data?: any) => {
-    res.write(`event: ${event}\ndata: ${JSON.stringify(data || {})}\n\n`);
-  };
-
+  console.log("Generate Notes Request Received");
+  
   try {
     const file = req.file;
     const title = req.body.title || "Untitled Lesson";
-    let extractedText = req.body.content || ""; // Accept pre-extracted text or raw text input
+    let extractedText = req.body.content || "";
     
+    if (file) console.log("PDF Uploaded Successfully");
+
     // Stage 1: Uploading & Extracting
-    sendEvent("progress", { stage: "Extracting Text", progress: 20 });
+    console.log("PDF Parsing Started");
     
     if (file) {
       const rawBuffer = file.buffer;
@@ -505,37 +501,65 @@ app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"
 
     // Stage 2: OCR Fallback
     if (extractedText.trim().length < 50 && file && file.mimetype.includes("image")) {
-       // If it's an image, run OCR
-       sendEvent("progress", { stage: "OCR Processing", progress: 40 });
        extractedText = await OcrService.extractTextFromImage(file.buffer.toString("base64"));
     } else if (extractedText.trim().length < 50) {
-      sendEvent("progress", { stage: "OCR Processing", progress: 40 });
       extractedText = "OCR fallback triggered. Note: Node.js server requires Ghostscript/Imagemagick for true PDF->Image OCR. Please ensure your PDF has an embedded text layer, or paste the text directly.";
     }
 
+    console.log("PDF Parsing Completed");
+    console.log("Extracted Text Length:", extractedText.length);
+
     if (!extractedText.trim()) {
-      throw new Error("No readable text nodes located in academic file.");
+      throw new Error("No readable text extracted from PDF");
     }
 
     // Stage 3: AI Analysis
-    sendEvent("progress", { stage: "AI Analysis", progress: 60 });
+    console.log("Sending Request To AI");
     
-    // Stage 4: Generating Notes
-    sendEvent("progress", { stage: "Generating Notes", progress: 80 });
-    const notesResult = await NotesService.generateStudyBuddyNotes(title, extractedText);
+    // Fallback block if NotesService.generateStudyBuddyNotes fails
+    let notesResult;
+    try {
+      notesResult = await NotesService.generateStudyBuddyNotes(title, extractedText);
+      console.log("AI Response Received");
+    } catch (aiErr: any) {
+      console.error("AI Generation Failed:", aiErr);
+      // Fail-Safe System (Step 9)
+      notesResult = {
+        title: title,
+        chapter_notes: [],
+        key_concepts: [],
+        definitions: [],
+        formulas: [],
+        examples: [],
+        revision_notes: ["AI Failed. Fallback Summary Generated."],
+        exam_questions: [],
+        viva_questions: [],
+        interview_questions: [],
+        flashcards: [],
+        key_takeaways: [extractedText.substring(0, 500) + "..."]
+      };
+      console.log("Fail-Safe Summary Generated");
+    }
     
-    // Default flashcards & mindmap for compatibility
-    const flashcardsData = await NotesService.generateFlashcards(extractedText);
-    const flashcards = flashcardsData.map((f, i) => ({
-      id: `fc_${Math.random().toString(36).substring(2, 9)}`,
-      question: f.question,
-      answer: f.answer,
-      bookmarked: false,
-      score: 0
-    }));
+    // Default flashcards & mindmap
+    let flashcards = [];
+    try {
+      const flashcardsData = await NotesService.generateFlashcards(extractedText);
+      flashcards = flashcardsData.map((f, i) => ({
+        id: `fc_${Math.random().toString(36).substring(2, 9)}`,
+        question: f.question,
+        answer: f.answer,
+        bookmarked: false,
+        score: 0
+      }));
+    } catch (e) { console.error("Flashcards fallback failed", e); }
 
-    const mindmapData = await NotesService.generateMindMap(title, extractedText);
+    let mindmapData = { topic: title, subtopics: [] };
+    try {
+      mindmapData = await NotesService.generateMindMap(title, extractedText);
+    } catch (e) { console.error("Mindmap fallback failed", e); }
 
+    console.log("Saving Notes");
     // Save notes to database
     const newNote = await UnifiedDB.createNote({
       userId: req.user.id,
@@ -553,7 +577,7 @@ app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"
       interview_questions: notesResult.interview_questions || [],
       key_takeaways: notesResult.key_takeaways || [],
       // Compatibility fields
-      summary: notesResult.title || "",
+      summary: notesResult.title || title,
       bulletPoints: (notesResult.key_takeaways || []).slice(0, 15),
       easyExplanation: (notesResult.key_concepts || []).map((k: any) => k.explanation).join(" ") || "",
       examNotes: (notesResult.revision_notes || []).join(" ") || "",
@@ -563,13 +587,23 @@ app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"
       ragChunks: []
     });
 
-    sendEvent("progress", { stage: "Complete", progress: 100 });
-    sendEvent("complete", { note: newNote });
-    res.end();
+    console.log("Notes Saved");
+    
+    console.log("Response Sent To Frontend");
+    return res.status(200).json({ success: true, notes: newNote });
+
   } catch (err: any) {
-    console.error("Advanced generation failed:", err);
-    sendEvent("error", { message: err.message });
-    res.end();
+    let errorMessage = err.message || "Unknown Error";
+    
+    // Handle AI provider JSON errors if parsed
+    try {
+      const parsedErr = JSON.parse(err.message);
+      if (parsedErr.message) errorMessage = parsedErr.message;
+    } catch (e) {}
+
+    console.error("Advanced generation failed:", errorMessage);
+    console.log("Response Sent To Frontend");
+    return res.status(400).json({ success: false, error: errorMessage });
   }
 });
 

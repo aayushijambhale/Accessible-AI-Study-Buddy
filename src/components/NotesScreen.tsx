@@ -62,6 +62,16 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   const [error, setError] = useState("");
   const [isUploadingFile, setIsUploadingFile] = useState(false);
 
+  // Debug Panel States
+  const [showDebugPanel, setShowDebugPanel] = useState(true);
+  const [debugStates, setDebugStates] = useState({
+    uploaded: false,
+    extracted: false,
+    requested: false,
+    received: false,
+    generated: false,
+    saved: false,
+  });
   // Interactive PDF controls
   const [pdfZoom, setPdfZoom] = useState(100);
   const [pdfActiveHighlightColor, setPdfActiveHighlightColor] = useState<string | null>(null);
@@ -308,7 +318,8 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     setError("");
     setLoadingGenerate(true);
     setGenerateProgress(10);
-    setProgressStatus("Connecting to pipeline...");
+    setProgressStatus("Uploading Document...");
+    setDebugStates({ uploaded: true, extracted: false, requested: false, received: false, generated: false, saved: false });
 
     try {
       // Setup FormData
@@ -320,7 +331,11 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
         formData.append("content", targetContent);
       }
 
-      // Fetch with SSE wrapper
+      setDebugStates(prev => ({ ...prev, extracted: true, requested: true }));
+      setProgressStatus("Connecting to pipeline and extracting text...");
+      setGenerateProgress(30);
+
+      // Fetch standard JSON endpoint
       const response = await fetch("/api/notes/generate-advanced", {
         method: "POST",
         headers: {
@@ -329,58 +344,17 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
         body: formData,
       });
 
-      if (!response.ok || !response.body) {
-        throw new Error("Pipeline connection failed.");
+      const responseData = await response.json();
+      setDebugStates(prev => ({ ...prev, received: true }));
+
+      if (!response.ok || !responseData.success) {
+        throw new Error(responseData.error || "Pipeline connection failed.");
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let done = false;
-      let finalNote = null;
-      let buffer = "";
-
-      while (!done) {
-        const { value, done: readerDone } = await reader.read();
-        done = readerDone;
-        if (value) {
-          buffer += decoder.decode(value, { stream: !done });
-          
-          let eventIndex;
-          while ((eventIndex = buffer.indexOf("\n\n")) !== -1) {
-            const eventBlock = buffer.slice(0, eventIndex);
-            buffer = buffer.slice(eventIndex + 2);
-            
-            let currentEvent = "";
-            let currentData = "";
-            
-            const lines = eventBlock.split("\n");
-            for (const line of lines) {
-              if (line.startsWith("event: ")) {
-                currentEvent = line.substring(7).trim();
-              } else if (line.startsWith("data: ")) {
-                currentData += line.substring(6);
-              }
-            }
-            
-            if (currentEvent && currentData) {
-              try {
-                const payload = JSON.parse(currentData);
-                if (currentEvent === "progress") {
-                  setGenerateProgress(payload.progress);
-                  setProgressStatus(payload.stage);
-                } else if (currentEvent === "complete") {
-                  finalNote = payload.note;
-                } else if (currentEvent === "error") {
-                  throw new Error(payload.message);
-                }
-              } catch (e: any) {
-                if (currentEvent === "error") throw e; // Rethrow actual errors
-                // Ignore JSON parse errors for incomplete data if any
-              }
-            }
-          }
-        }
-      }
+      const finalNote = responseData.notes;
+      setDebugStates(prev => ({ ...prev, generated: true, saved: true }));
+      setProgressStatus("Finalizing Notes...");
+      setGenerateProgress(100);
 
       if (finalNote) {
         setTimeout(() => {
@@ -400,42 +374,12 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
       }
 
     } catch (err: any) {
-      console.warn("Advanced generation failed, attempting fallback:", err);
-      try {
-        const res = await fetch("/api/notes/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ title: targetTitle, content: targetContent }),
-        });
-        
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || "Fallback generation also failed.");
-        }
-        
-        const finalNote = await res.json();
-        
-        setTimeout(() => {
-          SpeechEngine.speak(`Notes generated successfully. ${finalNote.title} ready for study review.`, voicePref);
-          setTitle("");
-          setContent("");
-          setUploadedPdf(null);
-          setActiveNote(finalNote);
-          fetchNotes();
-          setLoadingGenerate(false);
-          setGenerateProgress(0);
-          window.dispatchEvent(new CustomEvent("voice-create-notes-completed", { detail: { note: finalNote } }));
-        }, 500);
-      } catch (fallbackErr: any) {
-        console.error("Fallback error:", fallbackErr);
-        setError(err.message || fallbackErr.message || "Failed to generate notes");
-        addToast("Failed to generate notes", "error");
-        setLoadingGenerate(false);
-        setGenerateProgress(0);
-      }
+      console.error("Advanced generation failed:", err);
+      const actualError = err.message || "Unknown Error";
+      setError(actualError);
+      addToast(actualError, "error");
+      setLoadingGenerate(false);
+      setGenerateProgress(0);
     }
   };
 
@@ -847,6 +791,24 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 <div className="flex items-center gap-1.5 text-[9.5px] text-indigo-700 font-extrabold uppercase">
                   <Info className="w-3 h-3 text-[#4338CA]" /> Generative AI model is compiling interactive learning materials.
                 </div>
+              </div>
+            )}
+
+            {/* Debug Panel (Step 10) */}
+            {showDebugPanel && (
+              <div className="p-3 bg-gray-900 rounded-xl space-y-2">
+                <div className="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
+                  <span className="text-green-400 font-mono text-[10px] font-bold uppercase tracking-widest">Pipeline Debug</span>
+                  <button type="button" onClick={() => setShowDebugPanel(false)} className="text-gray-400 hover:text-white"><X className="w-3 h-3" /></button>
+                </div>
+                <ul className="text-[10px] font-mono text-gray-300 space-y-1">
+                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.uploaded ? "bg-green-500" : "bg-gray-600"}`}></span> 1. PDF Uploaded</li>
+                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.extracted ? "bg-green-500" : "bg-gray-600"}`}></span> 2. Text Extracted</li>
+                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.requested ? "bg-green-500" : "bg-gray-600"}`}></span> 3. AI Request Sent</li>
+                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.received ? "bg-green-500" : "bg-gray-600"}`}></span> 4. AI Response Received</li>
+                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.generated ? "bg-green-500" : "bg-gray-600"}`}></span> 5. Notes Generated</li>
+                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.saved ? "bg-green-500" : "bg-gray-600"}`}></span> 6. Saved Successfully</li>
+                </ul>
               </div>
             )}
 

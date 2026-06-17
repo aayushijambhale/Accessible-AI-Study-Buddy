@@ -50,10 +50,21 @@ export class CoreAIService {
     }
 
     console.error(`[AI] All fallback providers exhausted for ${operationName}.`);
+    
+    // Map standard HTTP errors to friendly messages
+    let friendlyMessage = "The AI service is currently experiencing high load or quota limits. Please try again later.";
+    const errCode = lastError?.status || lastError?.code;
+    
+    if (errCode === 429) friendlyMessage = "Quota exceeded. The AI service has reached its request limit.";
+    else if (errCode === 401) friendlyMessage = "Invalid AI service API key.";
+    else if (errCode === 403) friendlyMessage = "Forbidden access. Check your API key permissions.";
+    else if (errCode === 500) friendlyMessage = "AI service internal error. Please try again.";
+    else if (lastError?.message?.toLowerCase().includes("timeout")) friendlyMessage = "Network timeout. The AI service took too long to respond.";
+
     throw new Error(
       JSON.stringify({
-        message: "The AI service is currently experiencing high load or quota limits. Please try again later.",
-        code: lastError?.status || lastError?.code || 500,
+        message: friendlyMessage,
+        code: errCode || 500,
         provider: "FallbackExhausted",
         details: lastError?.message || String(lastError)
       })
