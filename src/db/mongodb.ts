@@ -250,6 +250,46 @@ export const ChatSession: any = mongoose.models.ChatSession || mongoose.model<IC
 export const Caption: any = mongoose.models.Caption || mongoose.model<ICaption>("Caption", CaptionSchema);
 export const Upload: any = mongoose.models.Upload || mongoose.model<IUpload>("Upload", UploadSchema);
 
+// Study Session Schema
+export interface IStudySession extends Document {
+  userId: string;
+  noteId?: string;
+  durationMinutes: number;
+  activityType: string;
+  createdAt: Date;
+}
+
+const StudySessionSchema = new Schema<IStudySession>({
+  userId: { type: String, required: true },
+  noteId: { type: String, default: "" },
+  durationMinutes: { type: Number, required: true },
+  activityType: { type: String, required: true },
+}, { timestamps: true });
+
+export const StudySession: any = mongoose.models.StudySession || mongoose.model<IStudySession>("StudySession", StudySessionSchema);
+
+// Analytics Schema
+export interface IAnalytics extends Document {
+  userId: string;
+  date: string; // YYYY-MM-DD
+  dailyStudyMinutes: number;
+  quizzesTaken: number;
+  notesGenerated: number;
+}
+
+const AnalyticsSchema = new Schema<IAnalytics>({
+  userId: { type: String, required: true },
+  date: { type: String, required: true },
+  dailyStudyMinutes: { type: Number, default: 0 },
+  quizzesTaken: { type: Number, default: 0 },
+  notesGenerated: { type: Number, default: 0 },
+}, { timestamps: true });
+
+// Compound index for efficient daily analytics aggregation
+AnalyticsSchema.index({ userId: 1, date: 1 }, { unique: true });
+
+export const Analytics: any = mongoose.models.Analytics || mongoose.model<IAnalytics>("Analytics", AnalyticsSchema);
+
 
 // -------------------------------------------------------------
 // DUAL ENGINE UNIFIED ACCESSIBLE DATABASE INTEGRATOR

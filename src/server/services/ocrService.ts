@@ -1,5 +1,5 @@
 import Tesseract from "tesseract.js";
-import { CoreAIService } from "./aiService.js";
+import { CoreAIService } from "./ai/provider.js";
 
 export class OcrService {
   /**

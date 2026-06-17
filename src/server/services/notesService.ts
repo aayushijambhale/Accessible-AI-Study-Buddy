@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import { CoreAIService } from "./aiService";
+import { CoreAIService } from "./ai/provider";
 import { ChunkingService } from "./chunkingService";
 
 export interface IFlashcardData {
@@ -21,25 +21,25 @@ export class NotesService {
    * If the text is very large, it will chunk the text and process the most important parts.
    */
   public static async generateStudyBuddyNotes(title: string, rawContent: string): Promise<any> {
-    // 1. Chunk Text
-    // Split large PDFs into manageable chunks to preserve context
     const chunks = ChunkingService.chunkText(rawContent, 6000);
-    
-    // We'll analyze the first 2 chunks for the core summary to save tokens, but RAG can still use the full text
     const analysisContent = chunks.slice(0, 2).join("\n\n---\n\n");
 
-    const prompt = `You are an expert teacher.
-Analyze the provided study material.
-Create:
-1. Short summary (100-200 words)
-2. Important Notes (Bullet points, max 15 points, exam oriented)
-3. Key Concepts (Explain simply, student friendly)
-4. Definitions (Short and precise)
-5. Frequently Asked Questions
-6. Revision Sheet (One-page quick revision)
-7. Most Important Topics (Rank by importance)
+    const prompt = `You are an expert professor and educational content creator.
 
-Do not repeat information. Focus only on high-value learning content.
+Analyze the study material and create:
+1. Chapter-wise Notes
+2. Key Concepts
+3. Important Definitions
+4. Important Formulas
+5. Examples
+6. One-Day Revision Notes
+7. Exam Questions
+8. Viva Questions
+9. Interview Questions
+10. Flashcards
+11. Key Takeaways
+
+Format using markdown headings and bullet points where applicable. Make notes concise, exam-focused, and easy to revise. Do not repeat information. Focus only on high-value learning content.
 
 Study Material Title: "${title}"
 Content: "${analysisContent.replace(/"/g, '\\"')}"`;
@@ -48,11 +48,16 @@ Content: "${analysisContent.replace(/"/g, '\\"')}"`;
       type: Type.OBJECT,
       properties: {
         title: { type: Type.STRING },
-        summary: { type: Type.STRING, description: "100-200 word summary" },
-        important_notes: {
+        chapter_notes: {
           type: Type.ARRAY,
-          items: { type: Type.STRING },
-          description: "Max 15 bullet points"
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              chapter: { type: Type.STRING },
+              notes: { type: Type.ARRAY, items: { type: Type.STRING } }
+            },
+            required: ["chapter", "notes"]
+          }
         },
         key_concepts: {
           type: Type.ARRAY,
@@ -76,15 +81,26 @@ Content: "${analysisContent.replace(/"/g, '\\"')}"`;
             required: ["term", "definition"]
           }
         },
-        exam_points: {
+        formulas: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              formula_name: { type: Type.STRING },
+              equation: { type: Type.STRING }
+            },
+            required: ["formula_name", "equation"]
+          }
+        },
+        examples: {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        revision_sheet: {
+        revision_notes: {
           type: Type.ARRAY,
           items: { type: Type.STRING }
         },
-        frequently_asked_questions: {
+        exam_questions: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
@@ -95,28 +111,57 @@ Content: "${analysisContent.replace(/"/g, '\\"')}"`;
             required: ["question", "answer"]
           }
         },
-        most_important_topics: {
+        viva_questions: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              topic: { type: Type.STRING },
-              rank: { type: Type.INTEGER }
+              question: { type: Type.STRING },
+              answer: { type: Type.STRING }
             },
-            required: ["topic", "rank"]
+            required: ["question", "answer"]
           }
+        },
+        interview_questions: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              answer: { type: Type.STRING }
+            },
+            required: ["question", "answer"]
+          }
+        },
+        flashcards: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              question: { type: Type.STRING },
+              answer: { type: Type.STRING }
+            },
+            required: ["question", "answer"]
+          }
+        },
+        key_takeaways: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
         }
       },
       required: [
         "title",
-        "summary",
-        "important_notes",
+        "chapter_notes",
         "key_concepts",
         "definitions",
-        "exam_points",
-        "revision_sheet",
-        "frequently_asked_questions",
-        "most_important_topics"
+        "formulas",
+        "examples",
+        "revision_notes",
+        "exam_questions",
+        "viva_questions",
+        "interview_questions",
+        "flashcards",
+        "key_takeaways"
       ]
     };
 

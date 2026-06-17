@@ -1,5 +1,5 @@
 import { Type } from "@google/genai";
-import { CoreAIService } from "./aiService";
+import { CoreAIService } from "./ai/provider";
 
 export class QuizService {
   public static async generateStudyQuiz(title: string, content: string, quizType: string, numQuestions: number): Promise<any[]> {

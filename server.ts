@@ -12,7 +12,7 @@ import { v2 as cloudinary } from "cloudinary";
 
 // Import custom application services
 import UnifiedDB, { User, Note, Quiz, QuizHistory, ChatSession, Caption, Upload } from "./src/db/mongodb";
-import { CoreAIService } from "./src/server/services/aiService";
+import { CoreAIService } from "./src/server/services/ai/provider";
 import { NotesService } from "./src/server/services/notesService";
 import { QuizService } from "./src/server/services/quizService";
 import { PdfService } from "./src/server/services/pdfService";
@@ -542,18 +542,21 @@ app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"
       title,
       rawContent: extractedText,
       // Map new schema fields
-      important_notes: notesResult.important_notes || [],
+      chapter_notes: notesResult.chapter_notes || [],
       key_concepts: notesResult.key_concepts || [],
       definitions: notesResult.definitions || [],
-      exam_points: notesResult.exam_points || [],
-      revision_sheet: notesResult.revision_sheet || [],
-      frequently_asked_questions: notesResult.frequently_asked_questions || [],
-      most_important_topics: notesResult.most_important_topics || [],
+      formulas: notesResult.formulas || [],
+      examples: notesResult.examples || [],
+      revision_notes: notesResult.revision_notes || [],
+      exam_questions: notesResult.exam_questions || [],
+      viva_questions: notesResult.viva_questions || [],
+      interview_questions: notesResult.interview_questions || [],
+      key_takeaways: notesResult.key_takeaways || [],
       // Compatibility fields
-      summary: notesResult.summary || "",
-      bulletPoints: notesResult.important_notes || [],
+      summary: notesResult.title || "",
+      bulletPoints: (notesResult.key_takeaways || []).slice(0, 15),
       easyExplanation: (notesResult.key_concepts || []).map((k: any) => k.explanation).join(" ") || "",
-      examNotes: (notesResult.exam_points || []).join(" ") || "",
+      examNotes: (notesResult.revision_notes || []).join(" ") || "",
       keyDefinitions: notesResult.definitions || [],
       flashcards,
       mindMap: mindmapData,
@@ -567,6 +570,28 @@ app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"
     console.error("Advanced generation failed:", err);
     sendEvent("error", { message: err.message });
     res.end();
+  }
+});
+
+// Diagram Analysis Endpoint
+app.post("/api/notes/analyze-diagram", authenticateToken, upload.single("file"), async (req: any, res) => {
+  try {
+    const file = req.file;
+    if (!file || !file.mimetype.includes("image")) {
+      return res.status(400).json({ error: "An image file is required for diagram analysis." });
+    }
+    
+    const base64Image = file.buffer.toString("base64");
+    const mimeType = file.mimetype;
+    
+    // Dynamically import to avoid top-level load errors if not implemented
+    const { VisionService } = require("./src/server/services/visionService");
+    const result = await VisionService.analyzeDiagram(base64Image, mimeType);
+    
+    res.json(result);
+  } catch (err: any) {
+    console.error("Diagram analysis failed:", err);
+    res.status(500).json({ error: err.message || "Failed to analyze diagram." });
   }
 });
 

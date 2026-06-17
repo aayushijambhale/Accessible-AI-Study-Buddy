@@ -283,7 +283,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
       
       {/* Overview Card */}
       <section 
-        className="relative bg-linear-to-r from-[#4338CA] to-[#6366F1] rounded-3xl p-8 text-white overflow-hidden shadow-xs border border-[#4338CA]"
+        className="relative bg-linear-to-r from-[#0F766E] to-[#14B8A6] rounded-3xl p-8 text-white overflow-hidden shadow-xs border border-[#0F766E]"
         onMouseEnter={() => handleMouseEnterCard("Dashboard Greeting Box", "Welcome back study buddy! Ready to achieve academic excellence scale today?")}
       >
         <div className="relative z-10 space-y-3">
@@ -301,7 +301,7 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
             <button
               id="dash-btn-quick-notes"
               onClick={() => onChangeTab("notes")}
-              className="bg-white text-[#4338CA] px-5 py-2.5 rounded-xl text-sm font-bold shadow-xs hover:bg-[#F8FAFC] transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="bg-white text-[#0F766E] px-5 py-2.5 rounded-xl text-sm font-bold shadow-xs hover:bg-[#FFFBF5] transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
             >
               Generate New Notes <ChevronRight className="w-4 h-4" />
             </button>
@@ -331,12 +331,12 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
           onMouseEnter={() => handleMouseEnterCard("Total Study Summaries Created", `${notesCountVal} note files generated.`)}
           className="card-soft p-6 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center gap-4 group"
         >
-          <div className="p-4 bg-[#4338CA]/10 text-[#4338CA] rounded-xl group-hover:bg-[#4338CA] group-hover:text-white transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
+          <div className="p-4 bg-[#0F766E]/10 text-[#0F766E] rounded-xl group-hover:bg-[#0F766E] group-hover:text-white transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
             <BookOpen className="w-7 h-7" />
           </div>
           <div>
-            <span className="text-xs font-bold text-[#312E81]/60 block uppercase tracking-wider">Total Notes</span>
-            <div className="text-3xl font-black text-[#312E81] mt-0.5">{notesCountVal}</div>
+            <span className="text-xs font-bold text-[#134E4A]/60 block uppercase tracking-wider">Total Notes</span>
+            <div className="text-3xl font-black text-[#134E4A] mt-0.5">{notesCountVal}</div>
           </div>
         </div>
 
@@ -417,19 +417,19 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                 <path
                   d="M 60 180 L 130 140 L 205 160 L 280 80 L 350 110 L 420 40 L 470 60"
                   fill="none"
-                  stroke="#4338CA"
+                  stroke="#0F766E"
                   strokeWidth="4"
                   strokeLinecap="round"
                 />
 
                 {/* Data points circles */}
-                <circle cx="60" cy="180" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="130" cy="140" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="205" cy="160" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="280" cy="80" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="350" cy="110" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="420" cy="40" r="5" fill="#4338CA" stroke="#FFFFFF" strokeWidth="2" />
-                <circle cx="470" cy="60" r="5" fill="#6366F1" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="60" cy="180" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="130" cy="140" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="205" cy="160" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="280" cy="80" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="350" cy="110" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="420" cy="40" r="5" fill="#0F766E" stroke="#FFFFFF" strokeWidth="2" />
+                <circle cx="470" cy="60" r="5" fill="#14B8A6" stroke="#FFFFFF" strokeWidth="2" />
 
                 {/* Labels */}
                 <text x="60" y="210" fontSize="10" fill="#312E81" textAnchor="middle" fontWeight="bold">Mon</text>
@@ -466,9 +466,9 @@ export default function DashboardScreen({ token, onChangeTab, voicePref, user }:
                       <span className="truncate">{quiz.name}</span>
                       <span>{quiz.score}%</span>
                     </div>
-                    <div className="w-full h-3 bg-[#F8FAFC] rounded-full overflow-hidden border border-[#4338CA]/5">
+                    <div className="w-full h-3 bg-[#FFFBF5] rounded-full overflow-hidden border border-[#0F766E]/5">
                       <div 
-                        className="bg-linear-to-r from-[#4338CA] to-[#6366F1] h-full rounded-full" 
+                        className="bg-linear-to-r from-[#0F766E] to-[#14B8A6] h-full rounded-full" 
                         style={{ width: `${quiz.score}%` }} 
                       />
                     </div>

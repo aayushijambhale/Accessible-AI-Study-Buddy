@@ -1,5 +1,5 @@
 import { createRequire } from "module";
-import { CoreAIService } from "./aiService.js";
+import { CoreAIService } from "./ai/provider.js";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
 
