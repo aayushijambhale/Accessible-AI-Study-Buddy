@@ -20,10 +20,11 @@
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTYzMTM5MSwiZXhwIjoxNzgyMjM2MTkxfQ.8d-GcGyeUW33Qzsm8gi9nMT_Nxk9seiBkjQibLz_dvA",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTcwNTgyNywiZXhwIjoxNzgyMzEwNjI3fQ.VMP8B6uaPz0bSNkxRv4Zrid1inF68CRIjSsEaa9D0p0",
         "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTcwNzY3MiwiZXhwIjoxNzgyMzEyNDcyfQ.jz8Z7HqdTCy9rz11JL99SE38h4UfGDgwZMAP2RjqlxI",
-        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTcwODgxOCwiZXhwIjoxNzgyMzEzNjE4fQ.zw3UhuRFilRDtO-0KaAd4tMyonzvEd9Ok3h-gyoxDBo"
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTcwODgxOCwiZXhwIjoxNzgyMzEzNjE4fQ.zw3UhuRFilRDtO-0KaAd4tMyonzvEd9Ok3h-gyoxDBo",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6InNpOWp1ajB0bSIsImVtYWlsIjoiYWF5dXNoaWFkbWluQGdtYWlsLmNvbSIsImlhdCI6MTc4MTg4MTYyMywiZXhwIjoxNzgyNDg2NDIzfQ.1ZnadM9FFmgf803yOFLTn8a77S_cK1lG_5-XemHg6KQ"
       ],
       "createdAt": "2026-06-13T14:30:13.644Z",
-      "updatedAt": "2026-06-17T15:06:58.667Z",
+      "updatedAt": "2026-06-19T15:07:03.910Z",
       "voiceSettings": {
         "enabled": false,
         "rate": 1,
@@ -34,7 +35,113 @@
       }
     }
   ],
-  "notes": [],
+  "notes": [
+    {
+      "_id": "oxcby8u5h",
+      "id": "note_beaj03sfk",
+      "flashcards": [],
+      "ragChunks": [],
+      "userId": "si9juj0tm",
+      "title": "DropVault_Security_Audit_Report (1)",
+      "rawContent": "SECURITY AUDIT REPORT  Application: DropVault (File System)  Confidential | May 6, 2026 | dropvaultmock.vercel.app  Vulnerability Assessment & Penetration Testing  Target URL   https://dropvaultmock.vercel.app/  Date   May 6, 2026  Credentials Used   user1 / password123  Classification   Confidential  Tool Used   Burp Suite Community Edition v2026.3.2  Labs Completed   3 / 3 (All flags captured and verified)\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Page 2  1. Objective  This security audit was conducted on the DropVault file-system web application to identify and exploit real vulnerabilities. Three vulnerabilities were successfully identified, exploited, and verified using Burp Suite Community Edition. All three lab flags were captured and confirmed through the Security Audit Submission portal.  2. Tools Used  • Burp Suite Community Edition v2026.3.2 – HTTP interception, Repeater module for crafting and replaying requests.  • Web Browser (Chrome 146) – Application navigation, manual testing, DevTools for cookie/session inspection.  • Manual Analysis – Endpoint enumeration, parameter manipulation, and logic testing.  3. Methodology  The application was accessed using the provided credentials (user1 / password123). All HTTP traffic was proxied through Burp Suite for interception and analysis. Each vulnerability was tested by crafting specific payloads   in   Burp   Suite's   Repeater   tab   and   observing   server   responses.   Evidence   was   collected   via screenshots at each stage.\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Page 3  4. Vulnerability Analysis  Only vulnerabilities confirmed through active exploitation and screenshot evidence are documented below. Three vulnerabilities were identified and all three flags were verified.  Q2 – File Upload Vulnerability (Lab 1)  File Upload Vulnerability – Burp Suite Evidence (Screenshot 4)  Severity   HIGH – Executable file accepted by the server  Endpoint   POST /api/upload (multipart/form-data)  Attack Performed   Using Burp Suite Repeater, a PHP file named 'exploit.php' was uploaded with the Content-Type header spoofed to 'image/png'. The request body contained a PNG magic byte header followed by PHP code. The filename in the Content-Disposition header was set to 'exploit.php'.  Server Response   HTTP/2 200 OK — JSON body returned: { \"message\": \"Security Alert: Executable detected!\", \"filename\": \"exploit.php\", \"flag\": \"lab-52db-e4fc-60fd-809c\", \"url\": \"/api/view-upload?file=exploit.php\" }  Observation   The server accepted the PHP executable despite the file extension mismatch. The internal upload URL was also exposed in the response, confirming path disclosure.  Flag Captured   lab-52db-e4fc-60fd-809c   n   Verified in Security Audit Submission portal  Risk   An attacker can upload malicious server-side scripts (PHP, JSP, etc.) and potentially execute arbitrary code on the server (Remote Code Execution).  Remediation   Validate both file extension and magic bytes (file signature) server-side. Store uploads outside the web root. Rename files to random UUIDs. Never return internal file paths in API responses.  Q7 – Insecure Direct Object Reference / IDOR (Lab 3)  IDOR – File Retrieval UI Evidence (Screenshots 2 & 3)  Severity   HIGH – Unauthorized access to another user's private files  Endpoint   File Retrieval UI   →   internal API: /api/download?file=  Attack Performed   In the 'File Retrieval' input field on the DropVault dashboard, the path '../config/server_secrects.txt' was entered and the Fetch button was clicked. No authentication or ownership check was performed by the server before returning the file contents.  Server Response   Console Output displayed: FILE: secret_plans.txt OWNER: admin lab-4132-2d1c-b186-9efd  Observation   The application returned a file owned by the 'admin' user to a regular authenticated user (user1). The filename, owner identity, and flag value were all exposed. No access control check was enforced between the requesting user and the file owner.  Flag Captured   lab-4132-2d1c-b186-9efd   n   Verified in Security Audit Submission portal\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Page 4  Risk   Any authenticated user can access any other user's files — including admin files — simply by guessing or manipulating the file path. Confidential documents, credentials, and private data are fully exposed.  Remediation   Validate file ownership server-side before serving any file. Use opaque file IDs (UUIDs) instead of raw filenames. Implement access control checks: user must own the resource being requested.\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Page 5  Q8 – Path Traversal (Lab 2)  Path Traversal – Burp Suite Evidence (Screenshot 6)  Severity   HIGH – Arbitrary server file read via directory traversal  Endpoint   GET /api/download?file=../config/server_secrets.txt HTTP/2  Attack Performed   Using Burp Suite Repeater (Tab 14), a GET request was sent to /api/download?file=../config/server_secrets.txt. The '../' sequence was used to traverse outside the intended upload directory and access a server configuration file.  Server Response   HTTP/2 200 OK — Content-Type: text/html — Content-Length: 23 Response body: lab-1d36-a42c-1b97-01b4  Observation   The server resolved the relative path traversal sequence without sanitization, returning the contents of a configuration file located outside the web root. The response confirmed successful directory traversal with a 200 OK status.  Flag Captured   lab-1d36-a42c-1b97-01b4   n   Verified in Security Audit Submission portal  Risk   An attacker can read any file on the server's filesystem that the web process has read access to — including .env files, private keys, database configs, and source code.  Remediation   Canonicalize all file paths and verify they fall within the allowed base directory. Reject any request containing '../' or encoded traversal sequences (%2e%2e%2f). Run the web server process with minimal filesystem permissions.  5. Flags Summary  All three flags were captured and submitted through the Security Audit Submission portal. Each flag was independently verified by the system.  Lab   Vulnerability Type   Captured Flag   Status Lab 1   File Upload Vulnerability   lab-52db-e4fc-60fd-809c   n   VERIFIED Lab 2   Path Traversal   lab-1d36-a42c-1b97-01b4   n   VERIFIED Lab 3   IDOR   lab-4132-2d1c-b186-9efd   n   VERIFIED  System confirmation: \"Security Audit Complete — You have successfully verified the security integrity of the DropVault infrastructure.\"  6. Conclusion  The security audit of DropVault identified three high-severity vulnerabilities, all of which were actively exploited and confirmed with captured flags:\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Page 6  •   File Upload Vulnerability (Lab 1):   The server accepted a PHP executable disguised as an image. This creates a direct path to Remote Code Execution.  •   IDOR (Lab 3):   The file retrieval feature returned admin-owned private files to a regular user with no ownership validation whatsoever.  •   Path Traversal (Lab 2):   The download API resolved directory traversal sequences, granting read access to server configuration files outside the web root.  All three vulnerabilities are classified HIGH severity due to the direct impact on data confidentiality and server integrity.   Immediate   patching   is   recommended   before   any   production   deployment.   A   re-test   should   be performed after fixes are applied to confirm all vulnerabilities have been properly remediated.\r\n",
+      "chapter_notes": [],
+      "key_concepts": [],
+      "definitions": [],
+      "formulas": [],
+      "examples": [],
+      "revision_notes": [
+        "AI Failed. Fallback Summary Generated."
+      ],
+      "exam_questions": [],
+      "viva_questions": [],
+      "interview_questions": [],
+      "key_takeaways": [
+        "SECURITY AUDIT REPORT  Application: DropVault (File System)  Confidential | May 6, 2026 | dropvaultmock.vercel.app  Vulnerability Assessment & Penetration Testing  Target URL   https://dropvaultmock.vercel.app/  Date   May 6, 2026  Credentials Used   user1 / password123  Classification   Confidential  Tool Used   Burp Suite Community Edition v2026.3.2  Labs Completed   3 / 3 (All flags captured and verified)\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Pa..."
+      ],
+      "summary": "DropVault_Security_Audit_Report (1)",
+      "bulletPoints": [
+        "SECURITY AUDIT REPORT  Application: DropVault (File System)  Confidential | May 6, 2026 | dropvaultmock.vercel.app  Vulnerability Assessment & Penetration Testing  Target URL   https://dropvaultmock.vercel.app/  Date   May 6, 2026  Credentials Used   user1 / password123  Classification   Confidential  Tool Used   Burp Suite Community Edition v2026.3.2  Labs Completed   3 / 3 (All flags captured and verified)\r\nDropVault Security Audit Report | Confidential May 2026 | dropvaultmock.vercel.app   Pa..."
+      ],
+      "easyExplanation": "",
+      "examNotes": "AI Failed. Fallback Summary Generated.",
+      "keyDefinitions": [],
+      "mindMap": {
+        "topic": "DropVault Security Audit Report (1)",
+        "subtopics": [
+          {
+            "title": "Report Header Information",
+            "items": [
+              "Application: DropVault (File System)",
+              "Confidentiality: Confidential",
+              "Date: May 6, 2026",
+              "Target URL: https://dropvaultmock.vercel.app/",
+              "Credentials Used: user1 / password123",
+              "Classification: Confidential",
+              "Tool Used (Header): Burp Suite Community Edition v2026.3.2",
+              "Labs Completed: 3 / 3 (All flags captured and verified)"
+            ]
+          },
+          {
+            "title": "1. Objective",
+            "items": [
+              "Purpose: Conduct security audit on DropVault file-system web application to identify and exploit real vulnerabilities.",
+              "Outcome: Three vulnerabilities successfully identified, exploited, and verified using Burp Suite Community Edition.",
+              "Verification: All three lab flags captured and confirmed through the Security Audit Submission portal."
+            ]
+          },
+          {
+            "title": "2. Tools Used",
+            "items": [
+              "Burp Suite Community Edition v2026.3.2: HTTP interception, Repeater module for crafting and replaying requests.",
+              "Web Browser (Chrome 146): Application navigation, manual testing, DevTools for cookie/session inspection.",
+              "Manual Analysis: Endpoint enumeration, parameter manipulation, and logic testing."
+            ]
+          },
+          {
+            "title": "3. Methodology",
+            "items": [
+              "Access: Application accessed using provided credentials (user1 / password123).",
+              "Traffic Proxy: All HTTP traffic proxied through Burp Suite for interception and analysis.",
+              "Testing: Each vulnerability tested by crafting specific payloads in Burp Suite's Repeater tab and observing server responses.",
+              "Evidence: Collected via screenshots at each stage."
+            ]
+          },
+          {
+            "title": "4. Vulnerability Analysis Overview",
+            "items": [
+              "Documentation Policy: Only vulnerabilities confirmed through active exploitation and screenshot evidence are documented.",
+              "Summary: Three vulnerabilities were identified and all three flags were verified."
+            ]
+          },
+          {
+            "title": "Q2 – File Upload Vulnerability (Lab 1)",
+            "items": [
+              "Severity: HIGH – Executable file accepted by the server.",
+              "Endpoint: POST /api/upload (multipart/form-data).",
+              "Attack Performed: PHP file 'exploit.php' uploaded with spoofed Content-Type header 'image/png', PNG magic byte header followed by PHP code in request body, filename in Content-Disposition header set to 'exploit.php'.",
+              "Server Response: HTTP/2 200 OK — JSON body returned: {\"message\": \"Security Alert: Executable detected!\", \"filename\": \"exploit.php\", \"flag\": \"lab-52db-e4fc-60fd-809c\", \"url\": \"/api/view-upload?file=exploit.php\"}.",
+              "Observation: Server accepted the PHP executable despite the file extension mismatch. Internal upload URL also exposed in the response, confirming path disclosure.",
+              "Flag Captured: lab-52db-e4fc-60fd-809c (Verified in Security Audit Submission portal).",
+              "Risk: An attacker can upload malicious server-side scripts (PHP, JSP, etc.) and potentially execute arbitrary code on the server (Remote Code Execution).",
+              "Remediation: Validate both file extension and magic bytes (file signature) server-side. Store uploads outside the web root. Rename files to random UUIDs. Never return internal file paths in API responses."
+            ]
+          },
+          {
+            "title": "Q7 – Insecure Direct Object Reference / IDOR (Lab 3)",
+            "items": [
+              "Severity: HIGH – Unauthorized access to another user's private files.",
+              "Endpoint: File Retrieval UI → internal API: /api/download?file=.",
+              "Attack Performed: In the 'File Retrieval' input field on the DropVault dashboard, the path '../config/server_secrects.txt' was entered and the Fetch button was clicked.",
+              "Server Response: Console Output displayed: FILE: secret_plans.txt OWNER: admin lab-4132-2d1c-b186-9efd.",
+              "Observation: The application returned a file owned by the 'admin' user to a regular authenticated user (user1). No authentication or ownership check was performed by the server before returning the file contents. The filename, owner identity, and flag value were also exposed."
+            ]
+          }
+        ]
+      },
+      "createdAt": "2026-06-19T15:08:21.932Z",
+      "updatedAt": "2026-06-19T15:08:21.932Z"
+    }
+  ],
   "quizzes": [],
   "quizHistory": [],
   "chatSessions": [],
