@@ -4,14 +4,11 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const getJwtSecret = () => {
-  const secret = process.env.JWT_SECRET;
-  if (!secret) {
-    console.error("❌ FATAL: JWT_SECRET environment variable is missing.");
-    throw new Error("JWT_SECRET missing");
-  }
-  return secret;
-};
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error("❌ FATAL: JWT_SECRET environment variable is missing. Halting server startup in alignment with strict Phase 4 security instructions. Please define it in your .env or Secrets panel.");
+  process.exit(1);
+}
 
 // Temporary in-memory OTP register for secure forgotten password workflows (Phase 4)
 interface IOtpRecord {
@@ -38,18 +35,18 @@ export class AuthService {
 
   // Generate short-lived Access Token containing user ID and email
   public static generateAccessToken(payload: { id: string; email: string }): string {
-    return jwt.sign(payload, getJwtSecret(), { expiresIn: this.ACCESS_TOKEN_EXPIRY });
+    return jwt.sign(payload, JWT_SECRET as string, { expiresIn: this.ACCESS_TOKEN_EXPIRY });
   }
 
   // Generate long-lived Refresh Token
   public static generateRefreshToken(payload: { id: string; email: string }): string {
-    return jwt.sign(payload, getJwtSecret(), { expiresIn: this.REFRESH_TOKEN_EXPIRY });
+    return jwt.sign(payload, JWT_SECRET as string, { expiresIn: this.REFRESH_TOKEN_EXPIRY });
   }
 
   // Verify access or refresh tokens securely
   public static verifyToken(token: string): any {
     try {
-      return jwt.verify(token, getJwtSecret());
+      return jwt.verify(token, JWT_SECRET as string);
     } catch (err) {
       return null;
     }

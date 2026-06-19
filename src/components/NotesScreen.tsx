@@ -28,9 +28,6 @@ import {
 } from "lucide-react";
 import { SpeechEngine } from "../utils/speech";
 import { NoteItem, VoicePreferences } from "../types";
-import { useToast } from "./ui/Toast";
-import { Skeleton } from "./ui/Skeleton";
-import { EmptyState } from "./ui/EmptyState";
 
 interface NotesProps {
   token: string;
@@ -62,29 +59,17 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   const [error, setError] = useState("");
   const [isUploadingFile, setIsUploadingFile] = useState(false);
 
-  // Debug Panel States
-  const [showDebugPanel, setShowDebugPanel] = useState(true);
-  const [debugStates, setDebugStates] = useState({
-    uploaded: false,
-    extracted: false,
-    requested: false,
-    received: false,
-    generated: false,
-    saved: false,
-  });
   // Interactive PDF controls
   const [pdfZoom, setPdfZoom] = useState(100);
   const [pdfActiveHighlightColor, setPdfActiveHighlightColor] = useState<string | null>(null);
   const [highlights, setHighlights] = useState<Record<number, string[]>>({}); // pageIndex: Array of text segments
   const [pdfViewMode, setPdfViewMode] = useState<"visual" | "raw">("visual");
 
-  // Note detail tab
-  const [detailTab, setDetailTab] = useState<"summary" | "detailed" | "revision" | "formulas" | "questions" | "flashcards" | "mindmap">("summary");
+  // Note detail tab: "summary" | "bullets" | "exam" | "easy" | "definitions"
+  const [detailTab, setDetailTab] = useState<"summary" | "bullets" | "exam" | "easy" | "definitions">("summary");
 
   // Interactive note items mastery checklist state (Phase 4 interactivity additions)
   const [masteredBullets, setMasteredBullets] = useState<Record<string, boolean>>({});
-
-  const { addToast } = useToast();
 
   // Trigger feedback hover audio
   const handleMouseEnterText = (label: string) => {
@@ -109,7 +94,6 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
       })
       .catch((err) => {
         console.error("Notes load failed", err);
-        addToast("Failed to load notes", "error");
         setLoadingList(false);
       });
   };
@@ -269,7 +253,6 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     } catch (err: any) {
       console.error("PDF engine failure:", err);
       setError(`Extraction failed: ${err.message}`);
-      addToast(`Extraction failed: ${err.message}`, "error");
       SpeechEngine.speak(`Error: ${err.message}`, voicePref);
     } finally {
       setIsUploadingFile(false);
@@ -288,7 +271,6 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
     reader.onerror = () => {
       setError("File reader failed to read standard bytes.");
-      addToast("Failed to read file", "error");
       setIsUploadingFile(false);
     };
 
@@ -314,70 +296,67 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     }
   };
 
-  const startNotesGeneration = async (targetTitle: string, targetContent: string, fileData?: File) => {
+  const startNotesGeneration = async (targetTitle: string, targetContent: string) => {
     setError("");
     setLoadingGenerate(true);
     setGenerateProgress(10);
-    setProgressStatus("Uploading Document...");
-    setDebugStates({ uploaded: true, extracted: false, requested: false, received: false, generated: false, saved: false });
+    setProgressStatus("Scanning file stream...");
+
+    const progressMilestones = [
+      { p: 25, label: "Scanning file stream..." },
+      { p: 50, label: "Extracting textbook layout & PDF vectors..." },
+      { p: 75, label: "Converting chapters under Easy-Explanation schemas..." },
+      { p: 90, label: "Summarizing with pedagogical standards..." }
+    ];
+
+    let milestoneIdx = 0;
+    const interval = setInterval(() => {
+      if (milestoneIdx < progressMilestones.length) {
+        setGenerateProgress(progressMilestones[milestoneIdx].p);
+        setProgressStatus(progressMilestones[milestoneIdx].label);
+        milestoneIdx++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 600);
 
     try {
-      // Setup FormData
-      const formData = new FormData();
-      formData.append("title", targetTitle);
-      if (fileData) {
-        formData.append("file", fileData);
-      } else {
-        formData.append("content", targetContent);
-      }
-
-      setDebugStates(prev => ({ ...prev, extracted: true, requested: true }));
-      setProgressStatus("Connecting to pipeline and extracting text...");
-      setGenerateProgress(30);
-
-      // Fetch standard JSON endpoint
-      const response = await fetch("/api/notes/generate-advanced", {
+      const res = await fetch("/api/notes/generate", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: formData,
+        body: JSON.stringify({ title: targetTitle, content: targetContent }),
       });
+      const data = await res.json();
 
-      const responseData = await response.json();
-      setDebugStates(prev => ({ ...prev, received: true }));
-
-      if (!response.ok || !responseData.success) {
-        throw new Error(responseData.error || "Pipeline connection failed.");
+      if (!res.ok) {
+        throw new Error(data.error || "Material parsing failed on backend.");
       }
 
-      const finalNote = responseData.notes;
-      setDebugStates(prev => ({ ...prev, generated: true, saved: true }));
-      setProgressStatus("Finalizing Notes...");
+      clearInterval(interval);
       setGenerateProgress(100);
+      setProgressStatus("Workspace created successfully!");
 
-      if (finalNote) {
-        setTimeout(() => {
-          SpeechEngine.speak(`Notes generated successfully. ${finalNote.title} ready for study review.`, voicePref);
-          setTitle("");
-          setContent("");
-          setUploadedPdf(null);
-          setActiveNote(finalNote);
-          fetchNotes();
-          setLoadingGenerate(false);
-          setGenerateProgress(0);
+      setTimeout(() => {
+        SpeechEngine.speak(`Notes generated successfully. ${data.title} ready for study review.`, voicePref);
+        setTitle("");
+        setContent("");
+        setUploadedPdf(null);
+        setActiveNote(data);
+        fetchNotes();
+        setLoadingGenerate(false);
+        setGenerateProgress(0);
 
-          window.dispatchEvent(new CustomEvent("voice-create-notes-completed", { detail: { note: finalNote } }));
-        }, 500);
-      } else {
-        throw new Error("Pipeline did not return final structure.");
-      }
+        // Dispatch completed event to let any waiting quiz generation triggers run!
+        window.dispatchEvent(new CustomEvent("voice-create-notes-completed", { detail: { note: data } }));
+      }, 500);
 
     } catch (err: any) {
-      console.error("Advanced generation failed:", err);
-      const actualError = err.message || "Unknown Error";
-      setError(actualError);
-      addToast(actualError, "error");
+      clearInterval(interval);
+      setError(err.message || "Failed notes compilation.");
+      SpeechEngine.speak(`Error: ${err.message}`, voicePref);
       setLoadingGenerate(false);
       setGenerateProgress(0);
     }
@@ -386,11 +365,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   // Submit parsed note block to database
   const handleGenerateNotes = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title) return;
-    
-    // We can extract the file directly from an input or use the uploadedPdf state
-    // But since the actual file object is lost in uploadedPdf, we will just pass the extracted text.
-    // If the user pastes text, we pass that.
+    if (!title || !content) return;
     await startNotesGeneration(title, content);
   };
 
@@ -438,45 +413,39 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
     SpeechEngine.speak(textToRead, voicePref);
   };
 
-  // Export DOCX File format
-  const handleDownloadDocx = async () => {
+  // Export File format
+  const handleDownloadTxt = () => {
     if (!activeNote) return;
 
-    try {
-      const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+    const fileText = `
+=========================================
+ACCESSIBLE STUDY BUDDY UNIT LESSON
+Title: ${activeNote.title}
+=========================================
 
-      const doc = new Document({
-        sections: [
-          {
-            properties: {},
-            children: [
-              new Paragraph({ text: activeNote.title, heading: HeadingLevel.HEADING_1 }),
-              new Paragraph({ text: "SUMMARY", heading: HeadingLevel.HEADING_2 }),
-              new Paragraph({ text: activeNote.summary || "" }),
-              new Paragraph({ text: "IMPORTANT NOTES", heading: HeadingLevel.HEADING_2 }),
-              ...(activeNote.important_notes || activeNote.bulletPoints || []).map(b => new Paragraph({ text: `• ${b}` })),
-              new Paragraph({ text: "KEY CONCEPTS", heading: HeadingLevel.HEADING_2 }),
-              ...(activeNote.key_concepts || []).map(c => new Paragraph({ children: [new TextRun({ text: `${c.concept}: `, bold: true }), new TextRun({ text: c.explanation })] })),
-            ],
-          },
-        ],
-      });
+1. SUMMARY OVERVIEW:
+${activeNote.summary}
 
-      const blob = await Packer.toBlob(doc);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute("download", `${activeNote.title.replace(/\s+/g, "_")}_lesson.docx`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+2. DETAILED EXAM CHEAT NOTES:
+${activeNote.examNotes}
 
-      SpeechEngine.speak(`Notes downloaded as DOCX file.`, voicePref);
-    } catch (err) {
-      console.error("DOCX export failed", err);
-      addToast("Failed to export DOCX", "error");
-      SpeechEngine.speak("DOCX export failed.", voicePref);
-    }
+3. SIMPLIFIED ANALOGY:
+${activeNote.easyExplanation}
+
+4. INCLUDED DEFINITIONS:
+${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n")}
+    `;
+
+    const blob = new Blob([fileText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `${activeNote.title.replace(/\s+/g, "_")}_lesson.txt`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    SpeechEngine.speak(`Notes downloaded as raw text sheet file.`, voicePref);
   };
 
   const handlePrintPdf = () => {
@@ -492,18 +461,18 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
       <div className="lg:col-span-5 space-y-6">
         
         {/* Unit Submission & Parser Form */}
-        <div className="bg-white rounded-3xl p-6 border border-[#4338CA]/10 space-y-4 shadow-sm relative overflow-hidden">
+        <div className="bg-white rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-sm relative overflow-hidden">
           
-          <div className="flex items-center justify-between border-b border-[#4338CA]/15 pb-2">
+          <div className="flex items-center justify-between border-b border-[#0F766E]/15 pb-2">
             <div className="flex items-center gap-2">
-              <div className="p-1.5 bg-[#4338CA]/10 rounded-lg text-[#4338CA]">
+              <div className="p-1.5 bg-[#0F766E]/10 rounded-lg text-[#0F766E]">
                 <Upload className="w-5 h-5 animate-pulse" />
               </div>
-              <h3 className="text-sm font-bold text-[#312E81] uppercase tracking-wider">
+              <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider">
                 Upload & Convert (Phase 4)
               </h3>
             </div>
-            <span className="bg-indigo-500/10 text-indigo-700 text-[9px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+            <span className="bg-emerald-500/10 text-emerald-700 text-[9px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
               PDF/Text Engine Ready
             </span>
           </div>
@@ -522,8 +491,8 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
             onDrop={handleDrop}
             className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
               isDragging 
-                ? "border-[#6366F1] bg-[#6366F1]/10 scale-95" 
-                : "border-[#4338CA]/20 hover:border-[#4338CA] bg-[#F8FAFC]/90 hover:bg-[#6366F1]/5"
+                ? "border-[#14B8A6] bg-[#14B8A6]/10 scale-95" 
+                : "border-[#0F766E]/20 hover:border-[#0F766E] bg-[#FFFBF5]/90 hover:bg-[#14B8A6]/5"
             }`}
           >
             <input
@@ -533,14 +502,14 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 const f = e.target.files?.[0];
                 if (f) handleFileUpload(f);
               }}
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
             />
             <div className="space-y-2 pointer-events-none">
               <div className="p-3 bg-white/80 rounded-full inline-block shadow-xs">
-                <FileText className={`w-8 h-8 ${isDragging ? "text-[#6366F1] animate-bounce" : "text-[#4338CA]"}`} />
+                <FileText className={`w-8 h-8 ${isDragging ? "text-[#14B8A6] animate-bounce" : "text-[#0F766E]"}`} />
               </div>
               <div>
-                <p className="text-xs font-bold text-[#312E81]">
+                <p className="text-xs font-bold text-[#134E4A]">
                   Drag and drop academic PDF or Text here
                 </p>
                 <p className="text-[10px] text-gray-400 font-semibold mt-1">
@@ -552,13 +521,13 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
           {/* DYNAMIC COMPREHENSIVE PDF TEXTBOOK PREVIEW PANE (Phase 4 interactive requirement) */}
           {uploadedPdf && (
-            <div className="border border-[#4338CA]/15 bg-white/80 backdrop-blur-md rounded-2xl p-4 space-y-3 animate-fadeIn">
+            <div className="border border-[#0F766E]/15 bg-white/80 backdrop-blur-md rounded-2xl p-4 space-y-3 animate-fadeIn">
               
               {/* Document bar */}
-              <div className="flex justify-between items-center bg-[#F8FAFC] p-2.5 rounded-xl border border-tan/30 text-xs">
+              <div className="flex justify-between items-center bg-[#FFFBF5] p-2.5 rounded-xl border border-tan/30 text-xs">
                 <div>
-                  <h4 className="font-black text-[#312E81] truncate max-w-[180px]">{uploadedPdf.name}</h4>
-                  <span className="text-[9px] text-[#4338CA]/80 font-bold uppercase">{uploadedPdf.size} • {uploadedPdf.pagesCount} Pages</span>
+                  <h4 className="font-black text-[#134E4A] truncate max-w-[180px]">{uploadedPdf.name}</h4>
+                  <span className="text-[9px] text-[#0F766E]/80 font-bold uppercase">{uploadedPdf.size} • {uploadedPdf.pagesCount} Pages</span>
                 </div>
                 <button
                   id="btn-remove-pdf"
@@ -567,7 +536,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     setTitle("");
                     setContent("");
                   }}
-                  className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="p-1 text-gray-400 hover:text-red-500 rounded-lg hover:bg-gray-100 cursor-pointer"
                   title="Remove document file context"
                 >
                   <X className="w-4 h-4" />
@@ -575,15 +544,15 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
               </div>
 
               {/* View options and Scaling controls */}
-              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#4338CA]/5 pb-2 text-[11px] font-bold">
+              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#0F766E]/5 pb-2 text-[11px] font-bold">
                 
                 {/* View switcher code */}
-                <div className="flex bg-[#F8FAFC] rounded-lg p-0.5 border border-tan/30">
+                <div className="flex bg-[#FFFBF5] rounded-lg p-0.5 border border-tan/30">
                   <button
                     id="btn-pdf-view-visual"
                     type="button"
                     onClick={() => setPdfViewMode("visual")}
-                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "visual" ? "bg-[#4338CA] text-white" : "text-[#312E81]/80 hover:bg-[#4338CA]/5"}`}
+                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "visual" ? "bg-[#0F766E] text-white" : "text-[#134E4A]/80 hover:bg-[#0F766E]/5"}`}
                   >
                     Visual PDF
                   </button>
@@ -591,19 +560,19 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     id="btn-pdf-view-raw"
                     type="button"
                     onClick={() => setPdfViewMode("raw")}
-                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "raw" ? "bg-[#4338CA] text-white" : "text-[#312E81]/80 hover:bg-[#4338CA]/5"}`}
+                    className={`px-2 py-1 rounded-md cursor-pointer transition-all ${pdfViewMode === "raw" ? "bg-[#0F766E] text-white" : "text-[#134E4A]/80 hover:bg-[#0F766E]/5"}`}
                   >
                     Plain Extract
                   </button>
                 </div>
 
                 {/* Scaling */}
-                <div className="flex items-center gap-1.5 bg-[#F8FAFC] rounded-lg p-1 px-2 border border-tan/30">
+                <div className="flex items-center gap-1.5 bg-[#FFFBF5] rounded-lg p-1 px-2 border border-tan/30">
                   <button 
                     id="btn-pdf-zoom-out"
                     type="button" 
                     onClick={() => setPdfZoom(Math.max(80, pdfZoom - 10))} 
-                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer"
                   >
                     <ZoomOut className="w-3.5 h-3.5" />
                   </button>
@@ -612,7 +581,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     id="btn-pdf-zoom-in"
                     type="button" 
                     onClick={() => setPdfZoom(Math.min(150, pdfZoom + 10))} 
-                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    className="p-0.5 hover:bg-gray-200 rounded-md cursor-pointer"
                   >
                     <ZoomIn className="w-3.5 h-3.5" />
                   </button>
@@ -622,11 +591,11 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
               {/* Highlighter Tool Select Palette (Excellent support for accessibility!) */}
               <div className="flex items-center gap-2 text-xs bg-amber-500/5 p-2 rounded-xl border border-amber-200/40">
-                <span className="font-extrabold text-[#312E81]">Highlighter Pen:</span>
+                <span className="font-extrabold text-[#134E4A]">Highlighter Pen:</span>
                 <div className="flex items-center gap-1.5">
                   {[
                     { color: "bg-yellow-200", label: "Yellow", value: "yellow" },
-                    { color: "bg-indigo-200", label: "Green", value: "green" },
+                    { color: "bg-emerald-200", label: "Green", value: "green" },
                     { color: "bg-pink-300", label: "Pink", value: "pink" }
                   ].map((colorObj) => {
                     const isSelected = pdfActiveHighlightColor === colorObj.value;
@@ -654,14 +623,14 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
               </div>
 
               {/* TEXTBOOK VISUAL PAGE CONTENT CARRIER CONTAINER */}
-              <div className="bg-[#F8FAFC] border border-orange-50 rounded-xl p-3 max-h-56 overflow-y-auto relative shadow-inner">
+              <div className="bg-[#FFFBF5] border border-orange-50 rounded-xl p-3 max-h-56 overflow-y-auto relative shadow-inner">
                 {pdfViewMode === "visual" ? (
                   <div 
-                    className="space-y-3 p-1 font-sans text-xs leading-relaxed text-[#312E81]/95"
+                    className="space-y-3 p-1 font-sans text-xs leading-relaxed text-[#134E4A]/95"
                     style={{ fontSize: `${pdfZoom}%` }}
                   >
                     {/* Dynamic Textbook visual columns render pages based on uploadedPdf */}
-                    <div className="border-b border-[#4338CA]/10 pb-1 mb-2 flex justify-between items-center text-[10px] font-mono text-[#4338CA]/70 uppercase tracking-widest font-bold">
+                    <div className="border-b border-[#0F766E]/10 pb-1 mb-2 flex justify-between items-center text-[10px] font-mono text-[#0F766E]/70 uppercase tracking-widest font-bold">
                       <span>TEXTBOOK PREVIEW CHAPTER</span>
                       <span>PAGE {uploadedPdf.currentPage} OF {uploadedPdf.pagesCount}</span>
                     </div>
@@ -690,7 +659,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                             <p
                               key={idx}
                               onClick={() => toggleTextHighlight(paraVal)}
-                              className={`cursor-pointer select-none rounded p-1.5 transition-all text-justify hover:bg-[#4338CA]/5 ${
+                              className={`cursor-pointer select-none rounded p-1.5 transition-all text-justify hover:bg-[#0F766E]/5 ${
                                 isHighlighted ? "bg-yellow-200/90 shadow-2xs border border-yellow-300" : ""
                               }`}
                             >
@@ -703,14 +672,14 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
                   </div>
                 ) : (
-                  <pre className="text-[10px] leading-relaxed select-text font-mono text-[#312E81] whitespace-pre-wrap">
+                  <pre className="text-[10px] leading-relaxed select-text font-mono text-[#134E4A] whitespace-pre-wrap">
                     {uploadedPdf.text}
                   </pre>
                 )}
               </div>
 
               {/* PDF Paginate Bottom Control panel */}
-              <div className="flex justify-between items-center text-xs text-[#4338CA] font-bold">
+              <div className="flex justify-between items-center text-xs text-[#0F766E] font-bold">
                 <button
                   id="btn-pdf-prev-page"
                   type="button"
@@ -720,7 +689,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     setUploadedPdf({ ...uploadedPdf, currentPage: nextPage });
                     SpeechEngine.speak(`Navigated to page ${nextPage}.`, voicePref);
                   }}
-                  className="px-2.5 py-1.5 bg-[#F8FAFC] hover:bg-[#4338CA]/10 border border-[#4338CA]/10 rounded-xl flex items-center gap-1 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="px-2.5 py-1.5 bg-[#FFFBF5] hover:bg-[#0F766E]/10 border border-[#0F766E]/10 rounded-xl flex items-center gap-1 cursor-pointer disabled:opacity-40"
                 >
                   <ChevronLeft className="w-3.5 h-3.5" /> Previous
                 </button>
@@ -734,7 +703,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     setUploadedPdf({ ...uploadedPdf, currentPage: nextPage });
                     SpeechEngine.speak(`Navigated to page ${nextPage}.`, voicePref);
                   }}
-                  className="px-2.5 py-1.5 bg-[#F8FAFC] hover:bg-[#4338CA]/10 border border-[#4338CA]/10 rounded-xl flex items-center gap-1 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-40 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="px-2.5 py-1.5 bg-[#FFFBF5] hover:bg-[#0F766E]/10 border border-[#0F766E]/10 rounded-xl flex items-center gap-1 cursor-pointer disabled:opacity-40"
                 >
                   Next <ChevronRight className="w-3.5 h-3.5" />
                 </button>
@@ -748,7 +717,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
             
             {/* Title text input */}
             <div>
-              <label htmlFor="notes-title" className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-1">
+              <label htmlFor="notes-title" className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-1">
                 Lesson / Textbook Title
               </label>
               <input
@@ -758,13 +727,13 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 placeholder="e.g. Biology Unit 3: Human Circulation"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-4 py-2.5 text-sm bg-[#F8FAFC] border border-[#4338CA]/10 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81]"
+                className="w-full px-4 py-2.5 text-sm bg-[#FFFBF5] border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
               />
             </div>
 
             {/* Paste content key text area */}
             <div>
-              <label htmlFor="notes-content" className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-1">
+              <label htmlFor="notes-content" className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-1">
                 Extracted Lesson content
               </label>
               <textarea
@@ -774,41 +743,23 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 placeholder="Paste paragraph curriculum, textbook content, or notes here..."
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full p-4 text-xs bg-[#F8FAFC] border border-[#4338CA]/10 focus:outline-none focus:border-[#4338CA] rounded-xl text-[#312E81] leading-relaxed resize-none"
+                className="w-full p-4 text-xs bg-[#FFFBF5] border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A] leading-relaxed resize-none"
               />
             </div>
 
             {/* Simulated Stage progress indicators bar during notes transformation */}
             {loadingGenerate && (
-              <div className="space-y-2 p-3 bg-indigo-500/5 rounded-[24px] border border-indigo-200/30 animate-pulse">
-                <div className="flex justify-between text-xs font-bold text-[#4338CA]">
+              <div className="space-y-2 p-3 bg-teal-500/5 rounded-2xl border border-teal-200/30 animate-pulse">
+                <div className="flex justify-between text-xs font-bold text-[#0F766E]">
                   <span>{progressStatus}</span>
                   <span>{generateProgress}%</span>
                 </div>
-                <div className="w-full bg-[#F8FAFC] h-2.5 rounded-full overflow-hidden border border-[#4338CA]/10 shadow-inner">
-                  <div className="bg-[#6366F1] h-full transition-all duration-300" style={{ width: `${generateProgress}%` }} />
+                <div className="w-full bg-[#FFFBF5] h-2.5 rounded-full overflow-hidden border border-[#0F766E]/10 shadow-inner">
+                  <div className="bg-[#14B8A6] h-full transition-all duration-300" style={{ width: `${generateProgress}%` }} />
                 </div>
-                <div className="flex items-center gap-1.5 text-[9.5px] text-indigo-700 font-extrabold uppercase">
-                  <Info className="w-3 h-3 text-[#4338CA]" /> Generative AI model is compiling interactive learning materials.
+                <div className="flex items-center gap-1.5 text-[9.5px] text-teal-700 font-extrabold uppercase">
+                  <Info className="w-3 h-3 text-[#0F766E]" /> Generative AI model is compiling interactive learning materials.
                 </div>
-              </div>
-            )}
-
-            {/* Debug Panel (Step 10) */}
-            {showDebugPanel && (
-              <div className="p-3 bg-gray-900 rounded-xl space-y-2">
-                <div className="flex justify-between items-center border-b border-gray-700 pb-2 mb-2">
-                  <span className="text-green-400 font-mono text-[10px] font-bold uppercase tracking-widest">Pipeline Debug</span>
-                  <button type="button" onClick={() => setShowDebugPanel(false)} className="text-gray-400 hover:text-white"><X className="w-3 h-3" /></button>
-                </div>
-                <ul className="text-[10px] font-mono text-gray-300 space-y-1">
-                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.uploaded ? "bg-green-500" : "bg-gray-600"}`}></span> 1. PDF Uploaded</li>
-                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.extracted ? "bg-green-500" : "bg-gray-600"}`}></span> 2. Text Extracted</li>
-                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.requested ? "bg-green-500" : "bg-gray-600"}`}></span> 3. AI Request Sent</li>
-                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.received ? "bg-green-500" : "bg-gray-600"}`}></span> 4. AI Response Received</li>
-                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.generated ? "bg-green-500" : "bg-gray-600"}`}></span> 5. Notes Generated</li>
-                  <li className="flex items-center gap-2"><span className={`w-2 h-2 rounded-full ${debugStates.saved ? "bg-green-500" : "bg-gray-600"}`}></span> 6. Saved Successfully</li>
-                </ul>
               </div>
             )}
 
@@ -817,7 +768,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
               id="notes-btn-generate"
               type="submit"
               disabled={loadingGenerate || isUploadingFile}
-              className="w-full py-3 bg-[#4338CA] text-white font-extrabold rounded-xl text-xs shadow-xs hover:bg-[#312E81] transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex justify-center items-center gap-2 uppercase tracking-wide focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="w-full py-3 bg-[#0F766E] text-white font-extrabold rounded-xl text-xs shadow-xs hover:bg-[#134E4A] transition-all disabled:opacity-50 cursor-pointer flex justify-center items-center gap-2 uppercase tracking-wide"
             >
               <Sparkles className="w-4.5 h-4.5" />
               {loadingGenerate ? "Synthesizing AI study package..." : "Generate Custom AI Study Pack"}
@@ -828,12 +779,12 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
         </div>
 
         {/* SAVED NOTES CATALOGUE PANEL */}
-        <div className="card-soft p-6 rounded-3xl shadow-sm space-y-3">
+        <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-extrabold text-[#312E81] uppercase tracking-wider">
+            <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">
               Saved Lesson units ({notes.length})
             </h3>
-            <span className="bg-indigo-500/10 text-indigo-800 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase">
+            <span className="bg-emerald-500/10 text-emerald-800 font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase">
               Relational DB
             </span>
           </div>
@@ -841,7 +792,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
           {loadingList ? (
             <div className="space-y-2">
               {[1, 2, 3].map((i) => (
-                <Skeleton key={i} className="h-12 w-full rounded-2xl" />
+                <div key={i} className="h-10 bg-slate-100 rounded-lg animate-pulse" />
               ))}
             </div>
           ) : notes.length > 0 ? (
@@ -861,25 +812,24 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     onMouseEnter={() => handleMouseEnterText(`Note: ${note.title}`)}
                     className={`w-full text-left p-3.5 rounded-2xl transition-all cursor-pointer border flex items-center justify-between gap-2.5 truncate ${
                       isActive
-                        ? "bg-[#6366F1]/10 border-[#6366F1] text-[#4338CA] font-extrabold"
-                        : "border-[#4338CA]/5 hover:bg-[#F8FAFC] text-[#312E81]/80 font-bold"
+                        ? "bg-[#14B8A6]/10 border-[#14B8A6] text-[#0F766E] font-extrabold"
+                        : "border-[#0F766E]/5 hover:bg-[#FFFBF5] text-[#134E4A]/80 font-bold"
                     }`}
                   >
                     <div className="flex items-center gap-2.5 truncate">
-                      <FileText className={`w-4 h-4 shrink-0 ${isActive ? "text-[#4338CA]" : "text-gray-400"}`} />
+                      <FileText className={`w-4 h-4 shrink-0 ${isActive ? "text-[#0F766E]" : "text-gray-400"}`} />
                       <span className="text-xs truncate">{note.title}</span>
                     </div>
-                    {isActive && <Check className="w-3.5 h-3.5 text-[#4338CA] shrink-0" />}
+                    {isActive && <Check className="w-3.5 h-3.5 text-[#0F766E] shrink-0" />}
                   </button>
                 );
               })}
             </div>
           ) : (
-            <EmptyState
-              icon={<BookOpen className="w-6 h-6" />}
-              title="No Notes"
-              description="Your study catalogue is empty."
-            />
+            <div className="text-center py-6 bg-slate-500/5 rounded-2xl">
+              <BookOpen className="w-8 h-8 text-[#134E4A]/25 mx-auto mb-1.5" />
+              <p className="text-xs text-[#134E4A]/60 font-semibold">Your study catalogue is empty.</p>
+            </div>
           )}
         </div>
 
@@ -889,13 +839,13 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
       <div className="lg:col-span-7">
         
         {activeNote ? (
-          <div className="bg-white rounded-3xl border border-[#4338CA]/10 overflow-hidden shadow-sm">
+          <div className="bg-white rounded-3xl border border-[#0F766E]/10 overflow-hidden shadow-sm">
             
             {/* Header detail bar */}
-            <div className="p-6 bg-[#F8FAFC] border-b border-[#4338CA]/5 flex flex-col sm:flex-row sm:items-center sm:justify-between justify-center gap-4">
+            <div className="p-6 bg-[#FFFBF5] border-b border-[#0F766E]/5 flex flex-col sm:flex-row sm:items-center sm:justify-between justify-center gap-4">
               <div>
-                <span className="text-[10px] font-bold text-[#6366F1] uppercase tracking-wider block">Generated Material Package</span>
-                <h2 className="text-lg font-black text-[#312E81] line-clamp-2">{activeNote.title}</h2>
+                <span className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-wider block">Generated Material Package</span>
+                <h2 className="text-lg font-black text-[#134E4A] line-clamp-2">{activeNote.title}</h2>
               </div>
               
               {/* Core Recitation & Print/Export actions controls */}
@@ -905,7 +855,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 <button
                   id="notes-btn-recite"
                   onClick={handleReadActiveSegment}
-                  className="p-2.5 bg-[#4338CA] text-white hover:bg-[#312E81] rounded-xl flex items-center gap-1 text-[11px] font-black cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 uppercase tracking-wider shadow-xs focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="p-2.5 bg-[#0F766E] text-white hover:bg-[#134E4A] rounded-xl flex items-center gap-1 text-[11px] font-black cursor-pointer uppercase tracking-wider shadow-xs"
                   title="Speak out active slide info"
                 >
                   <Volume2 className="w-4 h-4" /> Recite Aloud
@@ -915,7 +865,7 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 <button
                   id="notes-btn-stop"
                   onClick={() => SpeechEngine.stop()}
-                  className="p-2.5 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center justify-center cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="p-2.5 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl flex items-center justify-center cursor-pointer"
                   title="Mute current voice speaker"
                 >
                   <StopCircle className="w-4.5 h-4.5" />
@@ -925,35 +875,33 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 <button
                   id="notes-btn-print"
                   onClick={handlePrintPdf}
-                  className="p-2.5 border border-[#4338CA]/25 text-[#4338CA] hover:bg-[#6366F1]/10 rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="p-2.5 border border-[#0F766E]/25 text-[#0F766E] hover:bg-[#14B8A6]/10 rounded-xl cursor-pointer"
                   title="Print custom notes page perfectly"
                 >
                   <Printer className="w-4.5 h-4.5" />
                 </button>
 
-                {/* DOCX Download file block */}
+                {/* TXT Download file block */}
                 <button
-                  id="notes-btn-download-docx"
-                  onClick={handleDownloadDocx}
-                  className="p-2.5 border border-gray-200 text-gray-700 hover:bg-[#F8FAFC] rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 font-bold text-[11px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
-                  title="Download unit notes to local DOCX format"
+                  id="notes-btn-download-txt"
+                  onClick={handleDownloadTxt}
+                  className="p-2.5 border border-gray-200 text-gray-700 hover:bg-[#FFFBF5] rounded-xl cursor-pointer font-bold text-[11px]"
+                  title="Download unit notes to local TXT format"
                 >
-                  DOCX
+                  TXT
                 </button>
 
               </div>
             </div>
 
             {/* Navigation tabs row */}
-            <div className="flex border-b border-[#4338CA]/10 overflow-x-auto bg-[#F8FAFC]/30">
+            <div className="flex border-b border-[#0F766E]/10 overflow-x-auto bg-[#FFFBF5]/30">
               {[
                 { id: "summary", label: "1. Summary" },
-                { id: "detailed", label: "2. Detailed Notes" },
-                { id: "revision", label: "3. Revision Notes" },
-                { id: "formulas", label: "4. Formulas" },
-                { id: "questions", label: "5. Questions" },
-                { id: "flashcards", label: "6. Flashcards" },
-                { id: "mindmap", label: "7. Mind Map" },
+                { id: "bullets", label: "2. Key Points" },
+                { id: "exam", label: "3. Exam Cheat" },
+                { id: "easy", label: "4. Easy Explanation" },
+                { id: "definitions", label: "5. Definitions Dictionary" },
               ].map((tab) => {
                 const isActive = detailTab === tab.id;
                 return (
@@ -968,8 +916,8 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                     }}
                     className={`py-3 px-5 text-xs font-extrabold border-b-2 whitespace-nowrap cursor-pointer transition-all ${
                       isActive
-                        ? "border-[#4338CA] text-[#4338CA] bg-white font-black"
-                        : "border-transparent text-[#312E81]/60 hover:text-[#4338CA] hover:bg-[#F8FAFC]/20"
+                        ? "border-[#0F766E] text-[#0F766E] bg-white font-black"
+                        : "border-transparent text-[#134E4A]/60 hover:text-[#0F766E] hover:bg-[#FFFBF5]/20"
                     }`}
                   >
                     {tab.label}
@@ -979,33 +927,33 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
             </div>
 
             {/* Tab content display frame */}
-            <div className="p-6 md:p-8 min-h-96 text-[#312E81]/90">
+            <div className="p-6 md:p-8 min-h-96 text-[#134E4A]/90">
               
               {/* PRINT ELEMENT STYLING - Hidden on screen, visible during printing */}
-              <div className="hidden print:block space-y-6 text-[#312E81]">
-                <div className="border-b-2 border-[#4338CA] pb-2 mb-6">
+              <div className="hidden print:block space-y-6 text-[#134E4A]">
+                <div className="border-b-2 border-[#0F766E] pb-2 mb-6">
                   <h1 className="text-2xl font-black">{activeNote.title}</h1>
-                  <p className="text-xs font-bold text-[#4338CA] uppercase tracking-widest">Study Guide Lesson Workbook</p>
+                  <p className="text-xs font-bold text-[#0F766E] uppercase tracking-widest">Study Guide Lesson Workbook</p>
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 uppercase">I. Chapter Summary Outline</h3>
+                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 uppercase">I. Chapter Summary Outline</h3>
                   <p className="text-xs leading-relaxed">{activeNote.summary}</p>
                   
-                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">II. Important Highlight Points</h3>
+                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">II. Important Highlight Points</h3>
                   <ul className="list-disc pl-5 text-xs space-y-1">
                     {activeNote.bulletPoints.map((b, i) => <li key={i}>{b}</li>)}
                   </ul>
 
-                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">III. Simplified Metaphorical Analogy</h3>
+                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">III. Simplified Metaphorical Analogy</h3>
                   <p className="text-xs leading-relaxed italic">{activeNote.easyExplanation}</p>
 
-                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">IV. Exam Cheat Sheet Cues</h3>
+                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">IV. Exam Cheat Sheet Cues</h3>
                   <p className="text-xs leading-relaxed">{activeNote.examNotes}</p>
 
-                  <h3 className="text-sm font-bold border-b border-[#4338CA]/20 mt-6 uppercase">V. Active Definitions Dictionary</h3>
+                  <h3 className="text-sm font-bold border-b border-[#0F766E]/20 mt-6 uppercase">V. Active Definitions Dictionary</h3>
                   <div className="space-y-4">
                     {activeNote.keyDefinitions.map((d, i) => (
-                      <div key={i} className="text-xs"><strong className="text-[#4338CA]">{d.term}:</strong> {d.definition}</div>
+                      <div key={i} className="text-xs"><strong className="text-[#0F766E]">{d.term}:</strong> {d.definition}</div>
                     ))}
                   </div>
                 </div>
@@ -1016,115 +964,125 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
                 
                 {/* 1. Summary overview page */}
                 {detailTab === "summary" && (
-                  <div className="space-y-6 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.summary)}>
-                    <div className="space-y-4">
+                  <div className="space-y-4 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.summary)}>
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-5 h-5 text-[#0F766E]" />
+                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Chapter Summary Outline</h3>
+                    </div>
+                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
+                    <p className="text-xs leading-relaxed font-semibold text-gray-700 whitespace-pre-line bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50">
+                      {activeNote.summary}
+                    </p>
+                  </div>
+                )}
+
+                {/* 2. Interactive Key highlight points (with Mastery checklist tracker checks) */}
+                {detailTab === "bullets" && (
+                  <div className="space-y-4 animate-fadeIn">
+                    <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <BookOpen className="w-5 h-5 text-[#0F766E]" />
-                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Chapter Summary Outline</h3>
+                        <CheckCircle className="w-5 h-5 text-[#0F766E]" />
+                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Interactive Study Highlights</h3>
                       </div>
-                      <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                      <p className="text-xs leading-relaxed font-semibold text-gray-700 whitespace-pre-line bg-[#FFFBF5]/40 p-4 rounded-2xl border border-teal-50">
-                        {activeNote.summary}
+                      <span className="text-[10px] text-[#0F766E] font-black uppercase tracking-wider">Click row to mark mastered</span>
+                    </div>
+                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
+                    
+                    <ul className="space-y-3">
+                      {activeNote.bulletPoints.map((point, index) => {
+                        const isMastered = !!masteredBullets[point];
+                        return (
+                          <li 
+                            key={index} 
+                            onClick={() => {
+                              const nextState = !isMastered;
+                              setMasteredBullets({ ...masteredBullets, [point]: nextState });
+                              SpeechEngine.speak(nextState ? "Marked highlight point as mastered." : "Highlight point marked for review study.", voicePref);
+                            }}
+                            className={`flex items-start gap-3 text-xs font-semibold p-4 rounded-2xl border transition-all cursor-pointer select-none ${
+                              isMastered 
+                                ? "bg-emerald-500/10 border-emerald-400/40 text-emerald-900" 
+                                : "bg-[#FFFBF5] border-[#0F766E]/5 text-gray-700 hover:bg-teal-50/10"
+                            }`}
+                            onMouseEnter={() => handleMouseEnterText(point)}
+                          >
+                            <div className={`w-4.5 h-4.5 rounded-full flex items-center justify-center border shrink-0 mt-0.5 transition-all ${
+                              isMastered ? "bg-emerald-600 border-emerald-700 text-white" : "border-gray-400 bg-white"
+                            }`}>
+                              {isMastered && <Check className="w-3 h-3 text-white" />}
+                            </div>
+                            <span className={isMastered ? "line-through opacity-75" : ""}>{point}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+
+                {/* 3. Detailed exam cheat sheet notes */}
+                {detailTab === "exam" && (
+                  <div className="space-y-4 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.examNotes)}>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-amber-500" />
+                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Exam Cues & Takeaways Cheat Sheet</h3>
+                    </div>
+                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
+                    
+                    <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/10 relative">
+                      <p className="text-xs leading-relaxed text-[#134E4A] font-bold whitespace-pre-line">
+                        {activeNote.examNotes}
                       </p>
                     </div>
                   </div>
                 )}
 
-                {/* 2. Detailed Notes */}
-                {detailTab === "detailed" && (
-                  <div className="space-y-6 animate-fadeIn">
+                {/* 4. Easy metaphors block for accessibility learning needs */}
+                {detailTab === "easy" && (
+                  <div className="space-y-4 animate-fadeIn" onMouseEnter={() => handleMouseEnterText(activeNote.easyExplanation)}>
                     <div className="flex items-center gap-2">
-                      <Layers className="w-5 h-5 text-[#0F766E]" />
-                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Detailed Chapter Notes</h3>
+                      <span className="p-1 px-1.5 bg-sky-100 text-sky-700 rounded-lg text-xs">💡</span>
+                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Conversational Explanation metamodel</h3>
                     </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                    <div className="space-y-4">
-                      {(activeNote.chapter_notes || []).map((chapter, idx) => (
-                        <div key={idx} className="p-4 rounded-2xl border border-[#0F766E]/10 bg-[#FFFBF5]">
-                          <h4 className="font-bold text-[#0F766E] mb-2">{chapter.chapter}</h4>
-                          <ul className="list-disc pl-5 space-y-1 text-xs text-gray-700">
-                            {chapter.notes.map((note, nIdx) => <li key={nIdx}>{note}</li>)}
-                          </ul>
-                        </div>
-                      ))}
-                      {(activeNote.key_concepts || []).map((concept, idx) => (
-                        <div key={idx} className="p-4 rounded-2xl border border-[#0F766E]/10 bg-[#FFFBF5] space-y-2">
-                          <h4 className="text-xs uppercase font-black text-[#0F766E]">{concept.concept}</h4>
-                          <p className="text-xs text-gray-700 font-semibold">{concept.explanation}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 3. Revision Notes */}
-                {detailTab === "revision" && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-5 h-5 text-[#0F766E]" />
-                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Quick Revision Sheet</h3>
-                    </div>
+                    <span className="text-[10px] text-[#0F766E] block font-extrabold uppercase mt-0.5">Perfect for screen readers or simplified study sessions</span>
                     <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
                     
-                    <div className="p-5 rounded-2xl bg-[#14B8A6]/5 border border-[#14B8A6]/20 space-y-4">
-                      {(activeNote.revision_notes || []).map((point, idx) => (
-                        <p key={idx} className="text-xs leading-relaxed text-[#134E4A] font-bold">
-                          • {point}
-                        </p>
-                      ))}
+                    <div className="p-5 rounded-2xl bg-sky-500/5 border border-sky-400/20">
+                      <p className="text-xs leading-relaxed text-sky-950 font-bold italic">
+                        "{activeNote.easyExplanation}"
+                      </p>
                     </div>
                   </div>
                 )}
 
-                {/* 4. Formulas */}
-                {detailTab === "formulas" && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1 px-1.5 bg-teal-100 text-teal-700 rounded-lg text-xs">🧮</span>
-                      <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Important Formulas</h3>
-                    </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {(activeNote.formulas || []).map((formula, idx) => (
-                        <div key={idx} className="p-4 rounded-2xl border border-teal-200 bg-white shadow-sm space-y-2 text-center">
-                          <h4 className="text-xs font-black text-[#134E4A]">{formula.formula_name}</h4>
-                          <div className="p-3 bg-teal-50 rounded-xl font-mono text-[#0F766E] font-bold text-sm">
-                            {formula.equation}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* 5. Questions */}
-                {detailTab === "questions" && (
+                {/* 5. Key definitions dynamic flash dictionaries */}
+                {detailTab === "definitions" && (
                   <div className="space-y-4 animate-fadeIn">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Info className="w-5 h-5 text-[#0F766E]" />
-                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider">Exam & Viva Questions</h3>
+                        <Layers className="w-5 h-5 text-[#0F766E]" />
+                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider font-sans">Definitions dictionary</h3>
                       </div>
+                      <span className="text-[10px] text-[#0F766E] font-black uppercase">Study definitions</span>
                     </div>
                     <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
 
-                    <div className="space-y-3">
-                      {(activeNote.exam_questions || activeNote.viva_questions || []).map((faq, idx) => (
-                        <div key={idx} className="p-4 rounded-2xl border border-gray-200 bg-white shadow-sm space-y-2">
-                          <h4 className="text-xs font-black text-[#134E4A] flex gap-2"><span className="text-[#14B8A6]">Q:</span> {faq.question}</h4>
-                          <div className="h-px w-full bg-gray-100" />
-                          <p className="text-xs text-gray-600 font-semibold flex gap-2"><span className="text-teal-600 font-black">A:</span> {faq.answer}</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {activeNote.keyDefinitions.map((def, idx) => (
+                        <div
+                          key={idx}
+                          onMouseEnter={() => handleMouseEnterText(`${def.term}: ${def.definition}`)}
+                          className="p-4 rounded-2xl border border-[#0F766E]/10 bg-[#FFFBF5] hover:border-[#0F766E] hover:bg-white transition-all space-y-1.5 relative group"
+                        >
+                          <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-widest font-mono">TERM DEFINED</span>
+                          <h4 className="text-xs uppercase tracking-widest font-black text-[#0F766E]">
+                            {def.term}
+                          </h4>
+                          <p className="text-xs text-[#134E4A]/80 leading-relaxed font-semibold">
+                            {def.definition}
+                          </p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* 6. Flashcards & Mind Map tabs skipped for brevity, handle later or show empty */}
-                {(detailTab === "flashcards" || detailTab === "mindmap") && (
-                  <div className="p-10 text-center text-gray-500">
-                    <p>Select this mode from the dedicated study tools panel coming in the next update!</p>
                   </div>
                 )}
 
@@ -1134,12 +1092,12 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
 
           </div>
         ) : (
-          <div className="bg-white rounded-3xl border border-[#4338CA]/10 p-4 shadow-sm h-full flex flex-col justify-center">
-            <EmptyState
-              icon={<BookOpen className="w-12 h-12" />}
-              title="No active converted unit"
-              description="Select or drop an academic textbook unit file inside the left uploader panel. The generative API will synthesize a comprehensive workspace containing summaries, metaphors, practice exams, and definitions."
-            />
+          <div className="bg-white rounded-3xl border border-[#0F766E]/10 p-12 text-center shadow-sm">
+            <BookOpen className="w-16 h-16 text-[#134E4A]/25 mx-auto mb-4 animate-bounce" />
+            <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">No active converted unit</h3>
+            <p className="text-xs text-[#134E4A]/60 max-w-sm mx-auto font-semibold leading-relaxed mt-1">
+              Select or drop an academic textbook unit file inside the left uploader panel. The generative API will synthesize a comprehensive workspace containing summaries, metaphors, practice exams, and definitions.
+            </p>
           </div>
         )}
 

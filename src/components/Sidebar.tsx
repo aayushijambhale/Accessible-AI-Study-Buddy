@@ -31,20 +31,20 @@ export default function Sidebar({ currentTab, onChangeTab, onLogout, voicePref }
   };
 
   return (
-    <aside id="app-sidebar" className="w-full md:w-64 bg-[#4338CA] text-white border-r border-[#312E81]/30 flex flex-col justify-between shrink-0 h-auto md:h-screen sticky top-0">
+    <aside id="app-sidebar" className="w-full md:w-64 bg-white border-r border-[#0F766E]/10 flex flex-col justify-between shrink-0 h-auto md:h-screen sticky top-0">
       
       <div className="p-6 space-y-6">
         {/* Workspace Brand Title */}
         <div 
-          className="flex items-center gap-3 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="flex items-center gap-3 cursor-pointer"
           onMouseEnter={() => handleMouseEnterItem("AA-I Study Buddy Brand", "Welcome to Accessible AI Study Buddy Hub")}
         >
-          <div className="p-2 bg-[#6366F1] text-white rounded-xl">
+          <div className="p-2 bg-[#0F766E] text-white rounded-xl">
             <Sparkles className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="text-md font-extrabold text-white leading-tight tracking-tight">AI Study Buddy</h1>
-            <span className="text-[10px] font-bold text-[#A5B4FC] uppercase tracking-wider">Inclusive Studio</span>
+            <h1 className="text-md font-extrabold text-[#134E4A] leading-tight tracking-tight">AI Study Buddy</h1>
+            <span className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-wider">Inclusive Studio</span>
           </div>
         </div>
 
@@ -66,11 +66,11 @@ export default function Sidebar({ currentTab, onChangeTab, onLogout, voicePref }
                 onMouseEnter={() => handleMouseEnterItem(item.label, item.desc)}
                 className={`w-full text-left px-4 py-3 rounded-xl font-semibold flex items-center gap-3 transition-all cursor-pointer ${
                   isActive
-                    ? "bg-[#6366F1] text-white shadow-sm"
-                    : "text-white/80 hover:bg-[#6366F1]/30 hover:text-white"
+                    ? "bg-[#0F766E] text-white shadow-xs"
+                    : "text-[#134E4A]/80 hover:bg-[#14B8A6]/10 hover:text-[#0F766E]"
                 }`}
               >
-                <IconComponent className={`w-5 h-5 ${isActive ? "text-white" : "text-[#A5B4FC]"}`} />
+                <IconComponent className={`w-5 h-5 ${isActive ? "text-white" : "text-[#0F766E]"}`} />
                 <span className="text-sm">{item.label}</span>
               </button>
             );
@@ -79,7 +79,7 @@ export default function Sidebar({ currentTab, onChangeTab, onLogout, voicePref }
       </div>
 
       {/* Logout Action Bar */}
-      <div className="p-4 border-t border-[#312E81]/30">
+      <div className="p-4 border-t border-[#0F766E]/10">
         <button
           id="sidebar-btn-logout"
           onClick={() => {
@@ -89,9 +89,9 @@ export default function Sidebar({ currentTab, onChangeTab, onLogout, voicePref }
             }
           }}
           onMouseEnter={() => handleMouseEnterItem("Log Out", "Exit your student session safely")}
-          className="w-full text-left px-4 py-3 text-white/80 hover:bg-white/10 rounded-xl font-semibold flex items-center gap-3 transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#A5B4FC]"
+          className="w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-xl font-semibold flex items-center gap-3 transition-all cursor-pointer"
         >
-          <LogOut className="w-5 h-5 text-white/80" />
+          <LogOut className="w-5 h-5 text-red-500" />
           <span className="text-sm">Sign Out</span>
         </button>
       </div>

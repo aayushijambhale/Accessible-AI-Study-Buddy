@@ -1,21 +1,19 @@
-import React, { useState, useEffect, useRef, Suspense, lazy } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
 import LandingPage from "./components/LandingPage";
 import AuthPage from "./components/AuthPage";
+import DashboardScreen from "./components/DashboardScreen";
+import NotesScreen from "./components/NotesScreen";
+import QuizScreen from "./components/QuizScreen";
+import TutorScreen from "./components/TutorScreen";
+import VisualHelperScreen from "./components/VisualHelperScreen";
+import AccessibilityDeskScreen from "./components/AccessibilityDeskScreen";
+import ProfileScreen from "./components/ProfileScreen";
+import VoiceHistoryScreen from "./components/VoiceHistoryScreen";
 import ShortcutCheatSheetModal from "./components/ShortcutCheatSheetModal";
 import VoiceCommandOverlay from "./components/VoiceCommandOverlay";
 import MicroHintOverlay from "./components/MicroHintOverlay";
-
-// Lazy Loaded screens (Phase 12: Code Splitting)
-const DashboardScreen = lazy(() => import("./components/DashboardScreen"));
-const NotesScreen = lazy(() => import("./components/NotesScreen"));
-const QuizScreen = lazy(() => import("./components/QuizScreen"));
-const TutorScreen = lazy(() => import("./components/TutorScreen"));
-const VisualHelperScreen = lazy(() => import("./components/VisualHelperScreen"));
-const AccessibilityDeskScreen = lazy(() => import("./components/AccessibilityDeskScreen"));
-const ProfileScreen = lazy(() => import("./components/ProfileScreen"));
-const VoiceHistoryScreen = lazy(() => import("./components/VoiceHistoryScreen"));
 import { VoicePreferences, UserProfile, VoiceLog } from "./types";
 import { SpeechEngine } from "./utils/speech";
 
@@ -320,7 +318,11 @@ export default function App() {
             setIsVoiceOverlayListening(false);
           },
           (err) => {
-            console.error("Mic overlay error:", err);
+            if (err === "no-speech") {
+              console.log("Mic overlay: no speech detected.");
+            } else {
+              console.error("Mic overlay error:", err);
+            }
             setIsVoiceOverlayListening(false);
           }
         );
@@ -477,7 +479,7 @@ export default function App() {
   }
 
   return (
-    <div id="app-root-container" className="min-h-screen bg-[#F8FAFC] text-[#475569] flex flex-col md:flex-row transition-all">
+    <div id="app-root-container" className="min-h-screen bg-[#FFFBF5] text-[#134E4A] flex flex-col md:flex-row transition-all">
       {/* Sidebar navigation left-aligned */}
       <Sidebar
         currentTab={currentTab}
@@ -498,68 +500,62 @@ export default function App() {
         />
 
         {/* Content Portal */}
-        <main className="flex-1 bg-transparent p-2 md:p-4 transition-all">
-          <Suspense fallback={
-            <div className="flex items-center justify-center min-h-[50vh]">
-              <div className="w-10 h-10 border-4 border-[#6366F1]/20 border-t-[#6366F1] rounded-full animate-spin"></div>
-            </div>
-          }>
-            <div className="animate-fadeIn p-4">
-              {currentTab === "dashboard" && (
-                <DashboardScreen
-                  token={token}
-                  onChangeTab={setCurrentTab}
-                  voicePref={voicePref}
-                  user={user}
-                />
-              )}
-              {currentTab === "notes" && (
-                <NotesScreen
-                  token={token}
-                  voicePref={voicePref}
-                />
-              )}
-              {currentTab === "quiz" && (
-                <QuizScreen
-                  token={token}
-                  voicePref={voicePref}
-                />
-              )}
-              {currentTab === "tutor" && (
-                <TutorScreen
-                  token={token}
-                  voicePref={voicePref}
-                  onAddVoiceLog={handleAddVoiceLog}
-                />
-              )}
-              {currentTab === "visual" && (
-                <VisualHelperScreen
-                  token={token}
-                  voicePref={voicePref}
-                />
-              )}
-              {currentTab === "accessibility" && (
-                <AccessibilityDeskScreen
-                  token={token}
-                  voicePref={voicePref}
-                  onUpdatePreferences={handleUpdatePreferences}
-                />
-              )}
-              {currentTab === "voice-history" && (
-                <VoiceHistoryScreen
-                  voiceLogs={voiceLogs}
-                  onClearLogs={handleClearVoiceLogs}
-                  voicePref={voicePref}
-                />
-              )}
-              {currentTab === "profile" && (
-                <ProfileScreen
-                  token={token}
-                  voicePref={voicePref}
-                />
-              )}
-            </div>
-          </Suspense>
+        <main className="flex-1 bg-teal-50/10 p-2 md:p-4 transition-all">
+          <div className="animate-fadeIn p-4">
+            {currentTab === "dashboard" && (
+              <DashboardScreen
+                token={token}
+                onChangeTab={setCurrentTab}
+                voicePref={voicePref}
+                user={user}
+              />
+            )}
+            {currentTab === "notes" && (
+              <NotesScreen
+                token={token}
+                voicePref={voicePref}
+              />
+            )}
+            {currentTab === "quiz" && (
+              <QuizScreen
+                token={token}
+                voicePref={voicePref}
+              />
+            )}
+            {currentTab === "tutor" && (
+              <TutorScreen
+                token={token}
+                voicePref={voicePref}
+                onAddVoiceLog={handleAddVoiceLog}
+              />
+            )}
+            {currentTab === "visual" && (
+              <VisualHelperScreen
+                token={token}
+                voicePref={voicePref}
+              />
+            )}
+            {currentTab === "accessibility" && (
+              <AccessibilityDeskScreen
+                token={token}
+                voicePref={voicePref}
+                onUpdatePreferences={handleUpdatePreferences}
+              />
+            )}
+            {currentTab === "voice-history" && (
+              <VoiceHistoryScreen
+                voiceLogs={voiceLogs}
+                onClearLogs={handleClearVoiceLogs}
+                voicePref={voicePref}
+              />
+            )}
+            {currentTab === "profile" && (
+              <ProfileScreen
+                token={token}
+                voicePref={voicePref}
+              />
+            )}
+          </div>
         </main>
       </div>
 

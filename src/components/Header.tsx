@@ -129,23 +129,28 @@ export default function Header({
         setIsListeningForCommands(false);
       },
       (err) => {
-        console.error("Mic error:", err);
-        setVoiceCommandFeedback("Access failed.");
+        if (err === "no-speech") {
+          console.log("Speech recognition ended: no speech detected.");
+          setVoiceCommandFeedback("No speech heard.");
+        } else {
+          console.error("Mic error:", err);
+          setVoiceCommandFeedback("Access failed.");
+        }
         setIsListeningForCommands(false);
       }
     );
   };
 
   return (
-    <header className="bg-white border-b border-[#E2E8F0] px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+    <header className="bg-white border-b border-[#0F766E]/10 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
       
       {/* Greetings Block */}
       <div 
         className="text-center sm:text-left"
         onMouseEnter={() => handleMouseEnterText(`Welcome, ${user ? user.fullName : "Student"}. Explore your dashboard workspace.`)}
       >
-        <span className="text-xs uppercase font-extrabold text-[#6366F1] tracking-wider">AI STUDY COMPANION</span>
-        <h2 className="text-xl font-black text-[#312E81]">
+        <span className="text-xs uppercase font-extrabold text-[#14B8A6] tracking-wider">AI STUDY COMPANION</span>
+        <h2 className="text-xl font-black text-[#134E4A]">
           Hello, {user ? user.fullName : "Guest Learner"} 👋
         </h2>
       </div>
@@ -155,7 +160,7 @@ export default function Header({
         
         {/* Dynamic Voice feedback notification bubble */}
         {voiceCommandFeedback && (
-          <span className="text-xs bg-[#6366F1]/10 px-3 py-1.5 rounded-full font-bold text-[#6366F1] animate-pulse">
+          <span className="text-xs bg-[#14B8A6]/10 px-3 py-1.5 rounded-full font-bold text-[#0F766E] animate-pulse">
             {voiceCommandFeedback}
           </span>
         )}
@@ -168,7 +173,7 @@ export default function Header({
             setVoiceCommandFeedback("Audio cleared.");
           }}
           title="Stop reading current text"
-          className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="p-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl border border-red-200 transition-all cursor-pointer"
         >
           <StopCircle className="w-5 h-5" />
         </button>
@@ -180,8 +185,8 @@ export default function Header({
           title="Verbal command helper"
           className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
             isListeningForCommands
-              ? "bg-[#6366F1] border-[#6366F1] text-white animate-bounce"
-              : "bg-white border-[#E2E8F0] text-[#6366F1] hover:bg-[#F8FAFC]"
+              ? "bg-[#14B8A6] border-[#14B8A6] text-white animate-bounce"
+              : "bg-[#FFFBF5] border-[#0F766E]/15 text-[#0F766E] hover:bg-[#14B8A6]/15"
           }`}
         >
           <Mic className="w-5 h-5" />
@@ -195,8 +200,8 @@ export default function Header({
           title={voicePref.enabled ? "Disable screen hover recitation" : "Enable screen hover recitation"}
           className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center gap-2 ${
             voicePref.enabled
-              ? "bg-[#4338CA] border-[#4338CA] text-white"
-              : "bg-white border-[#E2E8F0] text-[#6366F1] hover:bg-[#F8FAFC]"
+              ? "bg-[#0F766E] border-[#0F766E] text-white"
+              : "bg-[#FFFBF5] border-[#0F766E]/15 text-[#0F766E] hover:bg-[#14B8A6]/15"
           }`}
         >
           {voicePref.enabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5 text-gray-400" />}
@@ -210,7 +215,7 @@ export default function Header({
           id="header-btn-text-zoom"
           onClick={rotateFontSize}
           title={`Text Font Zoom: currently ${voicePref.textZoom}`}
-          className="p-3 bg-white border border-[#E2E8F0] text-[#6366F1] hover:bg-[#F8FAFC] rounded-xl transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#6366F1] flex items-center gap-2"
+          className="p-3 bg-[#FFFBF5] border border-[#0F766E]/15 text-[#0F766E] hover:bg-[#14B8A6]/15 rounded-xl transition-all cursor-pointer flex items-center gap-2"
         >
           <Type className="w-5 h-5" />
           <span className="text-xs font-bold uppercase">{voicePref.textZoom}</span>
@@ -221,7 +226,7 @@ export default function Header({
           id="header-btn-shortcuts"
           onClick={onOpenCheatSheet}
           title="Show interactive keyboard shortcuts cheat sheet (Alt+K)"
-          className="p-3 bg-white border border-[#E2E8F0] text-[#6366F1] hover:bg-[#F8FAFC] rounded-xl transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#6366F1] flex items-center gap-2"
+          className="p-3 bg-[#FFFBF5] border border-[#0F766E]/15 text-[#0F766E] hover:bg-[#14B8A6]/15 rounded-xl transition-all cursor-pointer flex items-center gap-2"
         >
           <Keyboard className="w-5 h-5" />
           <span className="text-xs font-bold hidden md:inline">Shortcuts</span>

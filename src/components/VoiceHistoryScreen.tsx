@@ -34,14 +34,14 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
     <div id="voice-history-viewport" className="p-4 md:p-6 max-w-5xl mx-auto space-y-6 font-sans">
       
       {/* Banner / Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 card-soft p-6 rounded-3xl shadow-xs">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-[#0F766E]/10 shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-[#E6F4F1] text-[#4338CA] rounded-2xl">
+          <div className="p-3 bg-[#E6F4F1] text-[#0F766E] rounded-2xl">
             <History className="w-6 h-6 animate-spin-slow" />
           </div>
           <div onMouseEnter={() => handleMouseEnterText("Voice Command and Auditory Response History logs")}>
-            <h2 className="text-lg font-black text-[#312E81]">Auditory History Logs</h2>
-            <p className="text-xs text-[#312E81]/70 font-semibold leading-relaxed">
+            <h2 className="text-lg font-black text-[#134E4A]">Auditory History Logs</h2>
+            <p className="text-xs text-[#134E4A]/70 font-semibold leading-relaxed">
               Timeline recording all interpreted voice commands, conversation transcripts, and automated speaking feedbacks.
             </p>
           </div>
@@ -56,7 +56,7 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
                 SpeechEngine.speak("Cleared voice logs.", voicePref);
               }
             }}
-            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer"
           >
             <Trash2 className="w-4 h-4 shrink-0" />
             Clear Vocal History
@@ -74,7 +74,7 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
             placeholder="Search voice commands, transcripts, or tutor responses..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white border border-[#4338CA]/10 rounded-2xl text-xs focus:ring-2 focus:ring-[#4338CA]/20 focus:outline-none text-[#312E81] font-semibold"
+            className="w-full pl-11 pr-4 py-3 bg-white border border-[#0F766E]/10 rounded-2xl text-xs focus:ring-2 focus:ring-[#0F766E]/20 focus:outline-none text-[#134E4A] font-semibold"
           />
         </div>
       )}
@@ -87,7 +87,7 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
             return (
               <div 
                 key={log.id} 
-                className="bg-white rounded-3xl border border-[#4338CA]/10 hover:border-[#6366F1]/30 overflow-hidden shadow-xs hover:shadow-md transition-all p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                className="bg-white rounded-3xl border border-[#0F766E]/10 hover:border-[#14B8A6]/30 overflow-hidden shadow-xs hover:shadow-md transition-all p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
               >
                 
                 {/* Content info wrapper */}
@@ -96,8 +96,8 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
                   {/* Badge & Timestamp bar */}
                   <div className="flex flex-wrap items-center gap-2">
                     {isTutor ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black bg-[#E6F4F1] text-[#4338CA] px-2.5 py-1 rounded-full border border-[#4338CA]/10">
-                        <Sparkles className="w-3 h-3 text-[#6366F1]" />
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase font-black bg-[#E6F4F1] text-[#0F766E] px-2.5 py-1 rounded-full border border-[#0F766E]/10">
+                        <Sparkles className="w-3 h-3 text-[#14B8A6]" />
                         AI Tutor Chat
                       </span>
                     ) : (
@@ -116,17 +116,17 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
                     
                     {/* User Command / User voice */}
-                    <div className="bg-[#F8FAFC] border border-orange-50/75 p-3 rounded-2xl space-y-1">
+                    <div className="bg-[#FFFBF5] border border-orange-50/75 p-3 rounded-2xl space-y-1">
                       <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Interpreted Speech:</span>
-                      <p className="text-xs text-[#312E81] font-black italic">
+                      <p className="text-xs text-[#134E4A] font-black italic">
                         "{log.command || "[No text captured]"}"
                       </p>
                     </div>
 
                     {/* AI Spoken Response */}
-                    <div className="bg-indigo-50/20 border border-indigo-50/40 p-3 rounded-2xl space-y-1">
+                    <div className="bg-teal-50/20 border border-teal-50/40 p-3 rounded-2xl space-y-1">
                       <span className="text-[9px] uppercase font-bold text-gray-400 block tracking-wider">Verbal feedback response:</span>
-                      <p className="text-xs text-[#312E81] font-semibold leading-relaxed">
+                      <p className="text-xs text-[#134E4A] font-semibold leading-relaxed">
                         {log.response || "[Voice notification triggered]"}
                       </p>
                     </div>
@@ -141,7 +141,7 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
                     id={`btn-play-voice-log-resp-${log.id}`}
                     onClick={() => handleSpeakText(log.response)}
                     title="Read response aloud again"
-                    className="flex-1 md:flex-none px-3.5 py-2.5 bg-[#4338CA]/10 hover:bg-[#4338CA] text-[#4338CA] hover:text-white rounded-xl transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex items-center justify-center gap-1.5 text-[11px] font-black focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                    className="flex-1 md:flex-none px-3.5 py-2.5 bg-[#0F766E]/10 hover:bg-[#0F766E] text-[#0F766E] hover:text-white rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 text-[11px] font-black"
                   >
                     <Volume2 className="w-4 h-4" />
                     <span>Speak Response</span>
@@ -151,7 +151,7 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
                       id={`btn-play-voice-log-cmd-${log.id}`}
                       onClick={() => handleSpeakText(log.command)}
                       title="Read spoken command aloud"
-                      className="flex-grow md:flex-grow-0 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 text-[#312E81]/80 hover:text-gray-900 rounded-xl transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 text-[10px] font-bold flex items-center justify-center gap-1 shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                      className="flex-grow md:flex-grow-0 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 text-[#134E4A]/80 hover:text-gray-900 rounded-xl transition-all cursor-pointer text-[10px] font-bold flex items-center justify-center gap-1 shrink-0"
                     >
                       <span>Listen to command</span>
                     </button>
@@ -164,24 +164,24 @@ export default function VoiceHistoryScreen({ voiceLogs, onClearLogs, voicePref }
         </div>
       ) : (
         /* Empty States block */
-        <div className="text-center bg-white rounded-3xl p-12 border border-[#4338CA]/10 space-y-4">
-          <div className="inline-flex p-4 bg-[#F8FAFC] text-[#4338CA]/40 rounded-full border border-orange-50">
+        <div className="text-center bg-white rounded-3xl p-12 border border-[#0F766E]/10 space-y-4">
+          <div className="inline-flex p-4 bg-[#FFFBF5] text-[#0F766E]/40 rounded-full border border-orange-50">
             <Mic className="w-12 h-12" />
           </div>
           <div className="space-y-1.5 max-w-sm mx-auto">
-            <h3 className="text-sm font-black text-[#312E81] uppercase tracking-wider">No vocal logs captured yet</h3>
-            <p className="text-xs text-[#312E81]/70 font-bold leading-relaxed">
+            <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wider">No vocal logs captured yet</h3>
+            <p className="text-xs text-[#134E4A]/70 font-bold leading-relaxed">
               {searchTerm 
                 ? "Could not find any recorded interactions matching your keyword request." 
                 : "Active commands will list here as soon as you record or speak voice directives on the application header or conversational tutor."}
             </p>
           </div>
           {!searchTerm && (
-            <div className="bg-[#F8FAFC]/70 p-4 rounded-2xl border border-orange-50 max-w-lg mx-auto text-left space-y-2">
-              <span className="text-[10px] font-extrabold text-[#4338CA] uppercase block tracking-wider">💡 How to start voice commands:</span>
-              <ul className="text-[11px] font-medium text-[#312E81]/70 list-disc list-inside space-y-1">
-                <li>Click 🎤 <strong className="text-[#312E81]">Voice Control</strong> above, wait for the chime, and say "Go to Quiz Center" or "Open study notes".</li>
-                <li>Ask the 🎓 <strong className="text-[#312E81]">AI Tutor Chat</strong> dynamic questions using its microphone recorder.</li>
+            <div className="bg-[#FFFBF5]/70 p-4 rounded-2xl border border-orange-50 max-w-lg mx-auto text-left space-y-2">
+              <span className="text-[10px] font-extrabold text-[#0F766E] uppercase block tracking-wider">💡 How to start voice commands:</span>
+              <ul className="text-[11px] font-medium text-[#134E4A]/70 list-disc list-inside space-y-1">
+                <li>Click 🎤 <strong className="text-[#134E4A]">Voice Control</strong> above, wait for the chime, and say "Go to Quiz Center" or "Open study notes".</li>
+                <li>Ask the 🎓 <strong className="text-[#134E4A]">AI Tutor Chat</strong> dynamic questions using its microphone recorder.</li>
                 <li>Your voice input will instantly be logged here for subsequent inspection.</li>
               </ul>
             </div>

@@ -11,7 +11,7 @@ export class SpeechEngine {
   private static recognitionInstance: any = null;
 
   // READ ALOUD ASSISTANT (Phase 8 Text-to-Speech)
-  public static speak(text: string, preferences: VoicePreferences, onEndCallback?: () => void) {
+  public static speak(text: string, preferences: VoicePreferences) {
     if (!this.synth) return;
     this.synth.cancel(); // Stop any pending utterance first
 
@@ -31,12 +31,6 @@ export class SpeechEngine {
       if (matched) utterance.voice = matched;
     }
 
-    if (onEndCallback) {
-      utterance.onend = () => {
-        onEndCallback();
-      };
-    }
-
     this.synth.speak(utterance);
   }
 
@@ -47,7 +41,7 @@ export class SpeechEngine {
   }
 
   public static isSpeaking(): boolean {
-    return this.synth ? this.synth.speaking || this.synth.pending : false;
+    return this.synth ? this.synth.speaking : false;
   }
 
   // SPEECH RECOGNITION (Phase 7 Speech-to-Text)

@@ -95,18 +95,18 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
     <div id="accessibility-desk-screen" className="p-6 max-w-4xl mx-auto space-y-8">
       
       {/* Container Card */}
-      <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#4338CA]/10 p-8 space-y-6 shadow-sm">
+      <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#0F766E]/10 p-8 space-y-6 shadow-sm">
         
         {/* Header Title */}
         <div 
-          className="flex items-center gap-3 text-[#4338CA]"
+          className="flex items-center gap-3 text-[#0F766E]"
           onMouseEnter={() => handleMouseEnterText("Accessibility settings control deck")}
         >
-          <div className="p-2.5 bg-[#4338CA]/15 rounded-2xl">
-            <Sliders className="w-6 h-6 text-[#4338CA]" />
+          <div className="p-2.5 bg-[#0F766E]/15 rounded-2xl">
+            <Sliders className="w-6 h-6 text-[#0F766E]" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-[#312E81]">Accessibility Desk</h2>
+            <h2 className="text-xl font-extrabold text-[#134E4A]">Accessibility Desk</h2>
             <p className="text-xs text-gray-400 font-semibold">Fine-tune auditory feedback, high contrast filters, and document display sizes.</p>
           </div>
         </div>
@@ -115,8 +115,8 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4">
           
           {/* Section 1: Auditory Speech Customisation */}
-          <div className="space-y-5 bg-[#F8FAFC]/40 p-6 rounded-2xl border border-orange-50">
-            <div className="flex items-center gap-2 text-[#4338CA] border-b border-[#4338CA]/10 pb-2">
+          <div className="space-y-5 bg-[#FFFBF5]/40 p-6 rounded-2xl border border-orange-50">
+            <div className="flex items-center gap-2 text-[#0F766E] border-b border-[#0F766E]/10 pb-2">
               <Volume2 className="w-4 h-4" />
               <h3 className="text-xs font-bold uppercase tracking-wider">Acoustic Speech Reader</h3>
             </div>
@@ -124,14 +124,14 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
             {/* Hover Reader switch */}
             <div className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-gray-100">
               <div>
-                <span className="text-xs font-bold block text-[#312E81]">Line Reader Hover Cues</span>
+                <span className="text-xs font-bold block text-[#134E4A]">Line Reader Hover Cues</span>
                 <span className="text-[10px] text-gray-400 font-medium">Recite paragraphs verbally on mouse-over.</span>
               </div>
               <button
                 id="access-btn-toggle-hover"
                 onClick={handleToggleHoverMode}
                 className={`w-12 h-6.5 rounded-full p-0.5 transition-colors cursor-pointer flex relative items-center ${
-                  voicePref.enabled ? "bg-[#6366F1] justify-end" : "bg-gray-200 justify-start"
+                  voicePref.enabled ? "bg-[#14B8A6] justify-end" : "bg-gray-200 justify-start"
                 }`}
               >
                 <span className="w-5.5 h-5.5 bg-white rounded-full shadow-sm block" />
@@ -140,7 +140,7 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
 
             {/* Rate Speech slider */}
             <div className="space-y-1.5">
-              <div className="flex justify-between text-[11px] font-bold text-[#312E81]/80">
+              <div className="flex justify-between text-[11px] font-bold text-[#134E4A]/80">
                 <span>Vocal Reading Speed</span>
                 <span>{voicePref.rate.toFixed(1)}x</span>
               </div>
@@ -152,13 +152,13 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
                 step="0.1"
                 value={voicePref.rate}
                 onChange={(e) => handleRateChange(parseFloat(e.target.value))}
-                className="w-full accent-[#4338CA] bg-white h-1.5 rounded-full appearance-none cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 border border-[#4338CA]/10"
+                className="w-full accent-[#0F766E] bg-white h-1.5 rounded-full appearance-none cursor-pointer border border-[#0F766E]/10"
               />
             </div>
 
             {/* Pitch Speech slider */}
             <div className="space-y-1.5">
-              <div className="flex justify-between text-[11px] font-bold text-[#312E81]/80">
+              <div className="flex justify-between text-[11px] font-bold text-[#134E4A]/80">
                 <span>Voice Pitch Level</span>
                 <span>{voicePref.pitch.toFixed(1)}</span>
               </div>
@@ -170,21 +170,21 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
                 step="0.1"
                 value={voicePref.pitch}
                 onChange={(e) => handlePitchChange(parseFloat(e.target.value))}
-                className="w-full accent-[#4338CA] bg-white h-1.5 rounded-full appearance-none cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 border border-[#4338CA]/10"
+                className="w-full accent-[#0F766E] bg-white h-1.5 rounded-full appearance-none cursor-pointer border border-[#0F766E]/10"
               />
             </div>
 
             {/* Voice select */}
             {voices.length > 0 && (
               <div className="space-y-1">
-                <label htmlFor="access-select-voice" className="block text-[11px] font-extrabold text-[#312E81]/80">
+                <label htmlFor="access-select-voice" className="block text-[11px] font-extrabold text-[#134E4A]/80">
                   Target Speech Voice Name
                 </label>
                 <select
                   id="access-select-voice"
                   value={voicePref.voiceName}
                   onChange={(e) => handleVoiceChange(e.target.value)}
-                  className="w-full p-2 bg-white border border-[#4338CA]/10 text-xs rounded-xl text-[#312E81] focus:outline-none"
+                  className="w-full p-2 bg-white border border-[#0F766E]/10 text-xs rounded-xl text-[#134E4A] focus:outline-none"
                 >
                   <option value="">Browser Default Standard</option>
                   {voices.map((v, i) => (
@@ -199,8 +199,8 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
           </div>
 
           {/* Section 2: Visual Sensory Layout */}
-          <div className="space-y-5 bg-[#F8FAFC]/40 p-6 rounded-2xl border border-orange-50">
-            <div className="flex items-center gap-2 text-[#4338CA] border-b border-[#4338CA]/10 pb-2">
+          <div className="space-y-5 bg-[#FFFBF5]/40 p-6 rounded-2xl border border-orange-50">
+            <div className="flex items-center gap-2 text-[#0F766E] border-b border-[#0F766E]/10 pb-2">
               <Type className="w-4 h-4" />
               <h3 className="text-xs font-bold uppercase tracking-wider">Sensory Optics & Layout</h3>
             </div>
@@ -208,14 +208,14 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
             {/* High Contrast Visual */}
             <div className="flex justify-between items-center bg-white p-3.5 rounded-xl border border-gray-100">
               <div>
-                <span className="text-xs font-bold block text-[#312E81]">High Optics Contrast Mode</span>
+                <span className="text-xs font-bold block text-[#134E4A]">High Optics Contrast Mode</span>
                 <span className="text-[10px] text-gray-400 font-medium">Render visual borders and display outlines clearly.</span>
               </div>
               <button
                 id="access-btn-toggle-contrast"
                 onClick={handleToggleContrast}
                 className={`w-12 h-6.5 rounded-full p-0.5 transition-colors cursor-pointer flex relative items-center ${
-                  voicePref.contrastMode ? "bg-[#6366F1] justify-end" : "bg-gray-200 justify-start"
+                  voicePref.contrastMode ? "bg-[#14B8A6] justify-end" : "bg-gray-200 justify-start"
                 }`}
               >
                 <span className="w-5.5 h-5.5 bg-white rounded-full shadow-sm block" />
@@ -224,7 +224,7 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
 
             {/* Text Zoom Segment buttons */}
             <div className="space-y-2">
-              <span className="block text-[11px] font-extrabold text-[#312E81]/80">Document Text Font Zoom</span>
+              <span className="block text-[11px] font-extrabold text-[#134E4A]/80">Document Text Font Zoom</span>
               <div className="grid grid-cols-3 gap-2">
                 {(["normal", "large", "extra-large"] as const).map((z) => {
                   const isActive = voicePref.textZoom === z;
@@ -235,8 +235,8 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
                       onClick={() => handleZoomChange(z)}
                       className={`p-2.5 rounded-xl border text-[11.5px] font-black capitalize transition-all cursor-pointer ${
                         isActive
-                          ? "bg-[#4338CA] border-[#4338CA] text-white shadow-xs"
-                          : "bg-white border-gray-100 hover:bg-[#6366F1]/5 text-[#312E81]"
+                          ? "bg-[#0F766E] border-[#0F766E] text-white shadow-xs"
+                          : "bg-white border-gray-100 hover:bg-[#14B8A6]/5 text-[#134E4A]"
                       }`}
                     >
                       {z === "normal" ? "Standard" : z === "large" ? "Large (1.2x)" : "Max Zoom (1.4x)"}
@@ -251,12 +251,12 @@ export default function AccessibilityDeskScreen({ token, voicePref, onUpdatePref
         </div>
 
         {/* Action footer button: save config */}
-        <div className="flex justify-end pt-4 border-t border-[#4338CA]/10">
+        <div className="flex justify-end pt-4 border-t border-[#0F766E]/10">
           <button
             id="access-btn-save-pref"
             onClick={handleSavePreferences}
             disabled={saving}
-            className="px-6 py-3.5 bg-[#4338CA] hover:bg-[#312E81] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="px-6 py-3.5 bg-[#0F766E] hover:bg-[#134E4A] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin" />

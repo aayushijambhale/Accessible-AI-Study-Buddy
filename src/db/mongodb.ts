@@ -76,13 +76,6 @@ export interface INote extends Document {
   easyExplanation: string;
   examNotes: string;
   keyDefinitions: Array<{ term: string; definition: string }>;
-  important_notes?: string[];
-  key_concepts?: Array<{ concept: string; explanation: string }>;
-  definitions?: Array<{ term: string; definition: string }>;
-  exam_points?: string[];
-  revision_sheet?: string[];
-  frequently_asked_questions?: Array<{ question: string; answer: string }>;
-  most_important_topics?: Array<{ topic: string; rank: number }>;
   flashcards: IFlashcard[];
   mindMap?: IMindMapNode;
   ragChunks: IRagChunk[];
@@ -98,13 +91,6 @@ const NoteSchema = new Schema<INote>({
   easyExplanation: { type: String, default: "" },
   examNotes: { type: String, default: "" },
   keyDefinitions: [{ term: String, definition: String }],
-  important_notes: [{ type: String }],
-  key_concepts: [{ concept: String, explanation: String }],
-  definitions: [{ term: String, definition: String }],
-  exam_points: [{ type: String }],
-  revision_sheet: [{ type: String }],
-  frequently_asked_questions: [{ question: String, answer: String }],
-  most_important_topics: [{ topic: String, rank: Number }],
   flashcards: [{
     id: String,
     question: String,
@@ -130,7 +116,7 @@ const NoteSchema = new Schema<INote>({
 export interface IQuizQuestion {
   id: string;
   question: string;
-  type: "mcq" | "boolean" | "short" | "fill_in_blank";
+  type: "mcq" | "boolean" | "short";
   options: string[];
   correctAnswer: string;
   explanation: string;
@@ -151,7 +137,7 @@ const QuizSchema = new Schema<IQuiz>({
   questions: [{
     id: String,
     question: String,
-    type: { type: String, enum: ["mcq", "boolean", "short", "fill_in_blank"] },
+    type: { type: String, enum: ["mcq", "boolean", "short"] },
     options: [String],
     correctAnswer: String,
     explanation: String
@@ -250,46 +236,6 @@ export const ChatSession: any = mongoose.models.ChatSession || mongoose.model<IC
 export const Caption: any = mongoose.models.Caption || mongoose.model<ICaption>("Caption", CaptionSchema);
 export const Upload: any = mongoose.models.Upload || mongoose.model<IUpload>("Upload", UploadSchema);
 
-// Study Session Schema
-export interface IStudySession extends Document {
-  userId: string;
-  noteId?: string;
-  durationMinutes: number;
-  activityType: string;
-  createdAt: Date;
-}
-
-const StudySessionSchema = new Schema<IStudySession>({
-  userId: { type: String, required: true },
-  noteId: { type: String, default: "" },
-  durationMinutes: { type: Number, required: true },
-  activityType: { type: String, required: true },
-}, { timestamps: true });
-
-export const StudySession: any = mongoose.models.StudySession || mongoose.model<IStudySession>("StudySession", StudySessionSchema);
-
-// Analytics Schema
-export interface IAnalytics extends Document {
-  userId: string;
-  date: string; // YYYY-MM-DD
-  dailyStudyMinutes: number;
-  quizzesTaken: number;
-  notesGenerated: number;
-}
-
-const AnalyticsSchema = new Schema<IAnalytics>({
-  userId: { type: String, required: true },
-  date: { type: String, required: true },
-  dailyStudyMinutes: { type: Number, default: 0 },
-  quizzesTaken: { type: Number, default: 0 },
-  notesGenerated: { type: Number, default: 0 },
-}, { timestamps: true });
-
-// Compound index for efficient daily analytics aggregation
-AnalyticsSchema.index({ userId: 1, date: 1 }, { unique: true });
-
-export const Analytics: any = mongoose.models.Analytics || mongoose.model<IAnalytics>("Analytics", AnalyticsSchema);
-
 
 // -------------------------------------------------------------
 // DUAL ENGINE UNIFIED ACCESSIBLE DATABASE INTEGRATOR
@@ -308,8 +254,19 @@ class UnifiedDB {
       this.useMongo = false;
       return false;
     }
+    
+    // Support safe pre-connection scheme validation (fixes Phase 4 MongoParseErrors)
+    if (!uri.startsWith("mongodb://") && !uri.startsWith("mongodb+srv://")) {
+      console.warn("⚠️ Warning: Invalid MONGODB_URI connection scheme. It must start with 'mongodb://' or 'mongodb+srv://' - defaulting to local high-density JSON file engine mode.");
+      this.useMongo = false;
+      return false;
+    }
+
     try {
-      await mongoose.connect(uri);
+      await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 3000,
+        connectTimeoutMS: 3000
+      });
       console.info("⚡ Success: Successfully connected to real MongoDB Atlas Cluster!");
       this.useMongo = true;
       return true;
@@ -321,11 +278,11 @@ class UnifiedDB {
   }
 
   private static loadLocalJSON(): any {
+    const dbDir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
     if (!fs.existsSync(DB_FILE)) {
-      const dir = path.dirname(DB_FILE);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
       const fresh = { users: [], notes: [], quizzes: [], quizHistory: [], chatSessions: [], captions: [], uploads: [] };
       fs.writeFileSync(DB_FILE, JSON.stringify(fresh, null, 2));
       return fresh;
@@ -338,6 +295,10 @@ class UnifiedDB {
   }
 
   private static saveLocalJSON(data: any) {
+    const dbDir = path.dirname(DB_FILE);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
     fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
   }
 

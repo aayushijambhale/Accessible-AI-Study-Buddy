@@ -111,7 +111,7 @@ export default function MicroHintOverlay({ currentTab, voicePref, onOpenCheatShe
   return (
     <div
       id="micro-hint-container"
-      className={`fixed bottom-6 right-6 z-40 max-w-sm w-full bg-white/95 backdrop-blur-xs border border-[#6366F1]/20 rounded-3xl shadow-xl transition-all duration-300 transform ${
+      className={`fixed bottom-6 right-6 z-40 max-w-sm w-full bg-white/95 backdrop-blur-xs border border-[#14B8A6]/20 rounded-3xl shadow-xl transition-all duration-300 transform ${
         animate ? "opacity-100 translate-y-0 scale-100" : "opacity-0 translate-y-4 scale-95"
       }`}
     >
@@ -123,7 +123,7 @@ export default function MicroHintOverlay({ currentTab, voicePref, onOpenCheatShe
             setVisible(false);
             SpeechEngine.speak("Hint panel dismissed.", voicePref);
           }}
-          className="absolute top-3 right-3 p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-900 transition-all cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+          className="absolute top-3 right-3 p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-900 transition-all cursor-pointer"
           title="Minimize custom hints"
         >
           <X className="w-3.5 h-3.5" />
@@ -134,18 +134,18 @@ export default function MicroHintOverlay({ currentTab, voicePref, onOpenCheatShe
           
           {/* Header Banner */}
           <div className="flex items-center gap-2">
-            <div className="p-1 px-2.5 bg-[#E6F4F1] text-[#4338CA] rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
-              <Sparkles className="w-3 h-3 text-[#6366F1] animate-pulse" />
+            <div className="p-1 px-2.5 bg-[#E6F4F1] text-[#0F766E] rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-[#14B8A6] animate-pulse" />
               <span>{suggestion.title}</span>
             </div>
             <span className="text-[10px] text-gray-400 font-bold">{suggestion.prompt}</span>
           </div>
 
           {/* Action Callout bubble */}
-          <div className="bg-[#F8FAFC] border border-orange-50 p-2.5 rounded-2xl flex items-center justify-between gap-2 shadow-xs group">
+          <div className="bg-[#FFFBF5] border border-orange-50 p-2.5 rounded-2xl flex items-center justify-between gap-2 shadow-xs group">
             <div className="flex items-center gap-2 min-w-0">
               <Mic className="w-4 h-4 text-[#D97706] shrink-0 animate-bounce" />
-              <p className="text-xs font-black text-[#312E81] truncate">
+              <p className="text-xs font-black text-[#134E4A] truncate">
                 {suggestion.action}
               </p>
             </div>
@@ -154,7 +154,7 @@ export default function MicroHintOverlay({ currentTab, voicePref, onOpenCheatShe
               id="btn-speak-hint-audio"
               onClick={handleSpeakSuggestion}
               title="Speak suggestion out aloud"
-              className="p-1 bg-white hover:bg-orange-100/40 text-[#4338CA] hover:text-[#312E81] rounded-lg transition-all shrink-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="p-1 bg-white hover:bg-orange-100/40 text-[#0F766E] hover:text-[#134E4A] rounded-lg transition-all shrink-0 cursor-pointer"
             >
               <Volume2 className="w-3.5 h-3.5" />
             </button>
@@ -166,7 +166,7 @@ export default function MicroHintOverlay({ currentTab, voicePref, onOpenCheatShe
             <button
               id="link-btn-open-manual-shortcuts"
               onClick={onOpenCheatSheet}
-              className="text-[#4338CA] hover:text-[#6366F1] font-black tracking-wide flex items-center gap-0.5 shrink-0 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+              className="text-[#0F766E] hover:text-[#14B8A6] font-black tracking-wide flex items-center gap-0.5 shrink-0 transition-colors cursor-pointer"
             >
               <span>Verify list</span>
               <ArrowRight className="w-3 h-3" />

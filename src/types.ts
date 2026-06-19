@@ -25,13 +25,6 @@ export interface NoteItem {
   easyExplanation: string;
   examNotes: string;
   keyDefinitions: { term: string; definition: string }[];
-  important_notes?: string[];
-  key_concepts?: { concept: string; explanation: string }[];
-  definitions?: { term: string; definition: string }[];
-  exam_points?: string[];
-  revision_sheet?: string[];
-  frequently_asked_questions?: { question: string; answer: string }[];
-  most_important_topics?: { topic: string; rank: number }[];
   createdAt: string;
 }
 

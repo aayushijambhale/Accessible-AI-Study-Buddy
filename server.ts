@@ -8,15 +8,11 @@ import { rateLimit } from "express-rate-limit";
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 const pdfParse = require("pdf-parse");
-import { v2 as cloudinary } from "cloudinary";
+const cloudinary = require("cloudinary").v2;
 
 // Import custom application services
 import UnifiedDB, { User, Note, Quiz, QuizHistory, ChatSession, Caption, Upload } from "./src/db/mongodb";
-import { CoreAIService } from "./src/server/services/ai/provider";
-import { NotesService } from "./src/server/services/notesService";
-import { QuizService } from "./src/server/services/quizService";
-import { PdfService } from "./src/server/services/pdfService";
-import { OcrService } from "./src/server/services/ocrService";
+import { AIService } from "./src/server/aiService";
 import { AuthService } from "./src/server/authService";
 
 // Load Environment Keys
@@ -30,6 +26,9 @@ if (!process.env.JWT_SECRET) {
   console.error("❌ FATAL: JWT_SECRET environment variable is missing. Stop server startup.");
   process.exit(1);
 }
+
+// Tell Express to trust reverse proxy headers (e.g. X-Forwarded-For) under Cloud Run or nginx
+app.set("trust proxy", 1);
 
 // -------------------------------------------------------------
 // MIDLLEWARE CONFIGURATIONS (Phase 12 Rate Limiting & Hardening)
@@ -48,6 +47,7 @@ const standardLimiter = rateLimit({
   message: { error: "Too many requests from this address. Please retry after some minutes." },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false }
 });
 
 const strictAuthLimiter = rateLimit({
@@ -56,6 +56,7 @@ const strictAuthLimiter = rateLimit({
   message: { error: "Too many login/registration queries. Throttled for safety." },
   standardHeaders: true,
   legacyHeaders: false,
+  validate: { trustProxy: false }
 });
 
 app.use(express.json({ limit: "50mb" }));
@@ -396,10 +397,10 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
 
   try {
     // Generate summaries, explanations, exam points and key glossary using high performance Gemini (Phase 6)
-    const notesResult = await NotesService.generateStudyBuddyNotes(title, content);
+    const notesResult = await AIService.generateStudyBuddyNotes(title, content);
 
     // Formulate 6 flashcards by default under standard Note template (Phase 8)
-    const flashcardsData = await NotesService.generateFlashcards(content);
+    const flashcardsData = await AIService.generateFlashcards(content);
     const flashcards = flashcardsData.map((f, i) => ({
       id: `fc_${Math.random().toString(36).substring(2, 9)}`,
       question: f.question,
@@ -409,27 +410,39 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
     }));
 
     // Formulate clean MindMap hierarchy (Phase 9)
-    const mindmapData = await NotesService.generateMindMap(title, content);
+    const mindmapData = await AIService.generateMindMap(title, content);
 
     // Compute text segment vectors for real RAG embeddings mapping (Phase 7)
-    const rawChunks = CoreAIService.chunkContent(content);
+    // Increase chunk size to 1500 to significantly reduce the number of API calls and chunk records
+    const rawChunks = AIService.chunkContent(content, 1500);
     const ragChunks = [];
+    let quotaExceeded = false;
     
     // Generate text vectors asynchronously
     for (let i = 0; i < rawChunks.length; i++) {
       try {
         const textSegment = rawChunks[i];
         let vector: number[] = [];
-        if (CoreAIService.isGeminiAvailable()) {
-          vector = await CoreAIService.createEmbedding(textSegment);
+        if (AIService.isGeminiAvailable() && !quotaExceeded) {
+          vector = await AIService.createEmbedding(textSegment);
         }
         ragChunks.push({
           text: textSegment,
           pageNumber: Math.floor(i / 2) + 1,
           embedding: vector
         });
-      } catch (err) {
+      } catch (err: any) {
         console.warn(`Vector embeddings formulation failed on chunk ${i}:`, err);
+        const errMsg = err?.message || String(err);
+        if (
+          errMsg.toLowerCase().includes("quota") ||
+          errMsg.toLowerCase().includes("limit") ||
+          errMsg.toLowerCase().includes("exhausted") ||
+          errMsg.toLowerCase().includes("429")
+        ) {
+          console.warn("⚠️ Gemini API quota exceeded or rate-limited. Skipping further embedding calculations for this note to maintain performance.");
+          quotaExceeded = true;
+        }
       }
     }
 
@@ -469,163 +482,6 @@ app.post("/api/notes/generate", authenticateToken, async (req: any, res) => {
     } else {
       res.status(500).json({ error: err.message });
     }
-  }
-});
-
-import multer from "multer";
-const upload = multer({ storage: multer.memoryStorage() });
-
-// Advanced PDF Processing Pipeline (Standardized JSON)
-app.post("/api/notes/generate-advanced", authenticateToken, upload.single("file"), async (req: any, res) => {
-  console.log("Generate Notes Request Received");
-  
-  try {
-    const file = req.file;
-    const title = req.body.title || "Untitled Lesson";
-    let extractedText = req.body.content || "";
-    
-    if (file) console.log("PDF Uploaded Successfully");
-
-    // Stage 1: Uploading & Extracting
-    console.log("PDF Parsing Started");
-    
-    if (file) {
-      const rawBuffer = file.buffer;
-      try {
-        const result = await PdfService.extractTextFromBase64(rawBuffer.toString("base64"));
-        extractedText = result.text || "";
-      } catch (e) {
-        console.warn("pdf-parse failed:", e);
-      }
-    }
-
-    // Stage 2: OCR Fallback
-    if (extractedText.trim().length < 50 && file && file.mimetype.includes("image")) {
-       extractedText = await OcrService.extractTextFromImage(file.buffer.toString("base64"));
-    } else if (extractedText.trim().length < 50) {
-      extractedText = "OCR fallback triggered. Note: Node.js server requires Ghostscript/Imagemagick for true PDF->Image OCR. Please ensure your PDF has an embedded text layer, or paste the text directly.";
-    }
-
-    console.log("PDF Parsing Completed");
-    console.log("Extracted Text Length:", extractedText.length);
-
-    if (!extractedText.trim()) {
-      throw new Error("No readable text extracted from PDF");
-    }
-
-    // Stage 3: AI Analysis
-    console.log("Sending Request To AI");
-    
-    // Fallback block if NotesService.generateStudyBuddyNotes fails
-    let notesResult;
-    try {
-      notesResult = await NotesService.generateStudyBuddyNotes(title, extractedText);
-      console.log("AI Response Received");
-    } catch (aiErr: any) {
-      console.error("AI Generation Failed:", aiErr);
-      // Fail-Safe System (Step 9)
-      notesResult = {
-        title: title,
-        chapter_notes: [],
-        key_concepts: [],
-        definitions: [],
-        formulas: [],
-        examples: [],
-        revision_notes: ["AI Failed. Fallback Summary Generated."],
-        exam_questions: [],
-        viva_questions: [],
-        interview_questions: [],
-        flashcards: [],
-        key_takeaways: [extractedText.substring(0, 500) + "..."]
-      };
-      console.log("Fail-Safe Summary Generated");
-    }
-    
-    // Default flashcards & mindmap
-    let flashcards = [];
-    try {
-      const flashcardsData = await NotesService.generateFlashcards(extractedText);
-      flashcards = flashcardsData.map((f, i) => ({
-        id: `fc_${Math.random().toString(36).substring(2, 9)}`,
-        question: f.question,
-        answer: f.answer,
-        bookmarked: false,
-        score: 0
-      }));
-    } catch (e) { console.error("Flashcards fallback failed", e); }
-
-    let mindmapData = { topic: title, subtopics: [] };
-    try {
-      mindmapData = await NotesService.generateMindMap(title, extractedText);
-    } catch (e) { console.error("Mindmap fallback failed", e); }
-
-    console.log("Saving Notes");
-    // Save notes to database
-    const newNote = await UnifiedDB.createNote({
-      userId: req.user.id,
-      title,
-      rawContent: extractedText,
-      // Map new schema fields
-      chapter_notes: notesResult.chapter_notes || [],
-      key_concepts: notesResult.key_concepts || [],
-      definitions: notesResult.definitions || [],
-      formulas: notesResult.formulas || [],
-      examples: notesResult.examples || [],
-      revision_notes: notesResult.revision_notes || [],
-      exam_questions: notesResult.exam_questions || [],
-      viva_questions: notesResult.viva_questions || [],
-      interview_questions: notesResult.interview_questions || [],
-      key_takeaways: notesResult.key_takeaways || [],
-      // Compatibility fields
-      summary: notesResult.title || title,
-      bulletPoints: (notesResult.key_takeaways || []).slice(0, 15),
-      easyExplanation: (notesResult.key_concepts || []).map((k: any) => k.explanation).join(" ") || "",
-      examNotes: (notesResult.revision_notes || []).join(" ") || "",
-      keyDefinitions: notesResult.definitions || [],
-      flashcards,
-      mindMap: mindmapData,
-      ragChunks: []
-    });
-
-    console.log("Notes Saved");
-    
-    console.log("Response Sent To Frontend");
-    return res.status(200).json({ success: true, notes: newNote });
-
-  } catch (err: any) {
-    let errorMessage = err.message || "Unknown Error";
-    
-    // Handle AI provider JSON errors if parsed
-    try {
-      const parsedErr = JSON.parse(err.message);
-      if (parsedErr.message) errorMessage = parsedErr.message;
-    } catch (e) {}
-
-    console.error("Advanced generation failed:", errorMessage);
-    console.log("Response Sent To Frontend");
-    return res.status(400).json({ success: false, error: errorMessage });
-  }
-});
-
-// Diagram Analysis Endpoint
-app.post("/api/notes/analyze-diagram", authenticateToken, upload.single("file"), async (req: any, res) => {
-  try {
-    const file = req.file;
-    if (!file || !file.mimetype.includes("image")) {
-      return res.status(400).json({ error: "An image file is required for diagram analysis." });
-    }
-    
-    const base64Image = file.buffer.toString("base64");
-    const mimeType = file.mimetype;
-    
-    // Dynamically import to avoid top-level load errors if not implemented
-    const { VisionService } = require("./src/server/services/visionService");
-    const result = await VisionService.analyzeDiagram(base64Image, mimeType);
-    
-    res.json(result);
-  } catch (err: any) {
-    console.error("Diagram analysis failed:", err);
-    res.status(500).json({ error: err.message || "Failed to analyze diagram." });
   }
 });
 
@@ -709,7 +565,7 @@ app.post("/api/quiz/generate", authenticateToken, async (req: any, res) => {
       return res.status(404).json({ error: "Notes reference is invalid or unlinked." });
     }
 
-    const questions = await QuizService.generateStudyQuiz(note.title, note.rawContent, quizType, numQuestions);
+    const questions = await AIService.generateStudyQuiz(note.title, note.rawContent, quizType, numQuestions);
     const newQuiz = await UnifiedDB.createQuiz({
       noteId,
       userId: req.user.id,
@@ -822,8 +678,8 @@ app.post("/api/tutor/chat", authenticateToken, async (req: any, res) => {
         noteTitle = note.title;
 
         try {
-          if (CoreAIService.isGeminiAvailable()) {
-            const queryEmbedding = await CoreAIService.createEmbedding(userMessage);
+          if (AIService.isGeminiAvailable()) {
+            const queryEmbedding = await AIService.createEmbedding(userMessage);
 
             // Compute cosine similarities to identify top relevant vectors (RAG)
             const matches = note.ragChunks.map((chunk: any) => {
@@ -868,7 +724,7 @@ app.post("/api/tutor/chat", authenticateToken, async (req: any, res) => {
 
     // Formulate final AI prompt
     const chatHistoryStrings = session.messages.slice(-8).map((msg: any) => `${msg.sender}: ${msg.text}`);
-    const finalAnswer = await CoreAIService.generateTutorChatResponse(
+    const finalAnswer = await AIService.generateTutorChatResponse(
       userMessage,
       noteTitle,
       retrievedContext,
@@ -938,7 +794,7 @@ app.post("/api/image-caption", authenticateToken, async (req: any, res) => {
   }
 
   try {
-    const captionText = await CoreAIService.analyzeImageForAccessibility(cleanedBase64, typeFormat);
+    const captionText = await AIService.analyzeImageForAccessibility(cleanedBase64, typeFormat);
     const newReport = await UnifiedDB.createCaption({
       userId: req.user.id,
       title: title || `Visual Outline description: ${new Date().toLocaleDateString()}`,
@@ -1156,33 +1012,37 @@ app.get("/api/analytics", authenticateToken, async (req: any, res) => {
 // VITE CLIENT INTEGRATION & INGRESS ROUTING
 // -------------------------------------------------------------
 
+// Start listening on Port 3000 immediately to handle incoming traffic and prevent proxy timeouts
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 Production server launched in ingress container at http://0.0.0.0:${PORT}`);
+});
+
+// Setup Vite development middleware or static production serving
+if (process.env.NODE_ENV !== "production") {
+  createViteServer({
+    server: { middlewareMode: true },
+    appType: "spa"
+  }).then((vite) => {
+    app.use(vite.middlewares);
+    console.log("⚡ Vite development middleware bound to port 3000.");
+  }).catch((err) => {
+    console.error("Vite server creation failed:", err);
+  });
+} else {
+  const distPath = path.join(process.cwd(), "dist");
+  app.use(express.static(distPath));
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
+// Initialize database asynchronously in the background so connection delays do not block startup
 UnifiedDB.init().then((success) => {
   if (success) {
     console.info("⚡ Success: Relational MongoDB collection cluster online.");
   } else {
     console.info("⚠️ warning: Local high-density fallback activated.");
   }
-
-  if (process.env.NODE_ENV !== "production") {
-    createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa"
-    }).then((vite) => {
-      app.use(vite.middlewares);
-      console.log("⚡ Vite development middleware bound to port 3000.");
-    });
-  } else {
-    const distPath = path.join(process.cwd(), "dist");
-    app.use(express.static(distPath));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
-    });
-  }
-
-  app.listen(PORT, "localhost", () => {
-    console.log(`🚀 Production server launched at http://localhost:${PORT}`);
-  });
 }).catch((err) => {
-  console.error("FATAL: Database engine initialization failed:", err);
-  process.exit(1);
+  console.error("FATAL: Database engine initialization failed in background:", err);
 });

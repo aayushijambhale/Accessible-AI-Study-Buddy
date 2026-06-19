@@ -112,13 +112,13 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
     <div id="visual-helper-screen" className="p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-7xl mx-auto">
       {/* LEFT: Creator upload Form */}
       <div className="lg:col-span-5 space-y-6">
-        <div className="bg-white/60 backdrop-blur-md p-6 rounded-3xl border border-[#4338CA]/10 space-y-4 shadow-sm">
-          <div className="flex items-center gap-2 text-[#4338CA]">
+        <div className="bg-white/60 backdrop-blur-md p-6 rounded-3xl border border-[#0F766E]/10 space-y-4 shadow-sm">
+          <div className="flex items-center gap-2 text-[#0F766E]">
             <Sparkles className="w-5 h-5 animate-pulse" />
-            <h3 className="text-md font-bold text-[#312E81]">Explain Study Diagram</h3>
+            <h3 className="text-md font-bold text-[#134E4A]">Explain Study Diagram</h3>
           </div>
 
-          <p className="text-xs text-[#312E81]/70 leading-relaxed font-semibold">
+          <p className="text-xs text-[#134E4A]/70 leading-relaxed font-semibold">
             Upload or snap textbook pages, charts, or slides. Our AI assistant will transcribe text and describe diagrams visually.
           </p>
 
@@ -131,24 +131,24 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
 
           <form onSubmit={handleDescribeImage} className="space-y-4">
             <div>
-              <span className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-2">
+              <span className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-2">
                 Snap or Upload lecture image
               </span>
               <label
                 onMouseEnter={() => handleMouseEnterText("Click to choose study diagram or textbook page screenshot")}
-                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#4338CA]/15 hover:border-[#4338CA] bg-[#F8FAFC]/40 hover:bg-[#6366F1]/5 rounded-2xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all text-center relative overflow-hidden min-h-[140px] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-[#0F766E]/15 hover:border-[#0F766E] bg-[#FFFBF5]/40 hover:bg-[#14B8A6]/5 rounded-2xl cursor-pointer transition-all text-center relative overflow-hidden min-h-[140px]"
               >
                 {imagePreview ? (
                   <div className="space-y-2">
                     <img src={imagePreview} alt="Preview" className="max-h-24 mx-auto rounded-lg object-contain" />
-                    <span className="text-[10px] text-[#4338CA] font-bold block bg-indigo-50 px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] text-[#0F766E] font-bold block bg-teal-50 px-2 py-0.5 rounded-full">
                       Image Loaded
                     </span>
                   </div>
                 ) : (
                   <div className="space-y-1">
-                    <Upload className="w-8 h-8 text-[#4338CA]/70 mx-auto" />
-                    <span className="text-xs font-bold text-[#312E81]/80 block">Select Diagram Screenshot</span>
+                    <Upload className="w-8 h-8 text-[#0F766E]/70 mx-auto" />
+                    <span className="text-xs font-bold text-[#134E4A]/80 block">Select Diagram Screenshot</span>
                     <span className="text-[10px] text-gray-400 block">Supports PNG, JPG, GIF</span>
                   </div>
                 )}
@@ -163,7 +163,7 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
 
             {imagePreview && (
               <div>
-                <label htmlFor="visual-title" className="block text-xs font-bold text-[#312E81]/70 uppercase tracking-wider mb-1">
+                <label htmlFor="visual-title" className="block text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider mb-1">
                   Diagram Title
                 </label>
                 <input
@@ -173,7 +173,7 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
                   placeholder="e.g., Biology Mitosis Cycle Chart"
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  className="w-full px-4 py-2 text-sm bg-white border border-[#4338CA]/10 rounded-xl text-[#312E81] focus:outline-none focus:border-[#4338CA]"
+                  className="w-full px-4 py-2 text-sm bg-white border border-[#0F766E]/10 rounded-xl text-[#134E4A] focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
             )}
@@ -182,7 +182,7 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
               id="visual-btn-describe"
               type="submit"
               disabled={loading || !imagePreview}
-              className="w-full py-3.5 bg-gradient-to-br from-[#4338CA] to-[#6366F1] text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-md hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 flex justify-center items-center gap-2"
+              className="w-full py-3.5 bg-gradient-to-br from-[#0F766E] to-[#14B8A6] text-white font-bold rounded-xl text-xs uppercase tracking-wider shadow-md hover:opacity-90 transition-all disabled:opacity-50 cursor-pointer flex justify-center items-center gap-2"
             >
               <Eye className="w-4 h-4" />
               {loading ? "Analyzing visual slides..." : "Describe Graphic Element"}
@@ -191,8 +191,8 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
         </div>
 
         {/* History Catalog */}
-        <div className="bg-white/60 backdrop-blur-md p-6 rounded-3xl border border-[#4338CA]/10">
-          <h3 className="text-sm font-bold text-[#312E81] mb-3">Previous Diagram Analyses ({captions.length})</h3>
+        <div className="bg-white/60 backdrop-blur-md p-6 rounded-3xl border border-[#0F766E]/10">
+          <h3 className="text-sm font-bold text-[#134E4A] mb-3">Previous Diagram Analyses ({captions.length})</h3>
           {loadingList ? (
             <div className="space-y-2 animate-pulse">
               {[1, 2].map((i) => (
@@ -213,11 +213,11 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
                     onMouseEnter={() => handleMouseEnterText(`Diagram: ${cap.title}`)}
                     className={`w-full text-left p-3 rounded-xl border flex items-center gap-2.5 transition-all cursor-pointer ${
                       isActive
-                        ? "bg-[#6366F1]/10 border-[#6366F1] text-[#4338CA] font-bold"
-                        : "border-transparent hover:bg-[#F8FAFC]/20 text-[#312E81]/80"
+                        ? "bg-[#14B8A6]/10 border-[#14B8A6] text-[#0F766E] font-bold"
+                        : "border-transparent hover:bg-[#FFFBF5]/20 text-[#134E4A]/80"
                     }`}
                   >
-                    <FileText className="w-4 h-4 text-[#4338CA] shrink-0" />
+                    <FileText className="w-4 h-4 text-[#0F766E] shrink-0" />
                     <span className="text-xs truncate">{cap.title}</span>
                   </button>
                 );
@@ -234,23 +234,23 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
       {/* RIGHT: Display screen */}
       <div className="lg:col-span-7">
         {activeCaption ? (
-          <div className="bg-white/70 backdrop-blur-md rounded-3xl border border-[#4338CA]/10 overflow-hidden shadow-sm flex flex-col min-h-[400px]">
-            <div className="p-6 bg-[#F8FAFC]/60 border-b border-[#4338CA]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="bg-white/70 backdrop-blur-md rounded-3xl border border-[#0F766E]/10 overflow-hidden shadow-sm flex flex-col min-h-[400px]">
+            <div className="p-6 bg-[#FFFBF5]/60 border-b border-[#0F766E]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
-                <span className="text-[10px] font-bold text-[#6366F1] uppercase tracking-wider block">Visual description report</span>
-                <h4 className="text-lg font-black text-[#312E81]">{activeCaption.title}</h4>
+                <span className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-wider block">Visual description report</span>
+                <h4 className="text-lg font-black text-[#134E4A]">{activeCaption.title}</h4>
               </div>
 
               <div className="flex gap-2">
                 <button
                   onClick={handleReciteDescription}
-                  className="px-3.5 py-2 bg-[#4338CA] text-white hover:bg-[#312E81] rounded-xl flex items-center gap-1.5 text-xs font-bold cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="px-3.5 py-2 bg-[#0F766E] text-white hover:bg-[#134E4A] rounded-xl flex items-center gap-1.5 text-xs font-bold cursor-pointer transition-all"
                 >
                   <Volume2 className="w-4 h-4" /> Recite Aloud
                 </button>
                 <button
                   onClick={() => SpeechEngine.stop()}
-                  className="p-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+                  className="p-2 border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 rounded-xl cursor-pointer"
                 >
                   <StopCircle className="w-4 h-5" />
                 </button>
@@ -258,20 +258,20 @@ export default function VisualHelperScreen({ token, voicePref }: VisualHelperPro
             </div>
 
             <div className="p-8 flex-1 space-y-4">
-              <h4 className="text-xs font-bold text-[#4338CA] uppercase tracking-widest">Accessibility Transcriptions & Cues</h4>
+              <h4 className="text-xs font-bold text-[#0F766E] uppercase tracking-widest">Accessibility Transcriptions & Cues</h4>
               <p
                 onMouseEnter={() => handleMouseEnterText(activeCaption.description)}
-                className="text-sm text-[#312E81]/90 leading-relaxed font-medium whitespace-pre-line bg-[#F8FAFC]/40 p-5 rounded-2xl border border-indigo-50"
+                className="text-sm text-[#134E4A]/90 leading-relaxed font-medium whitespace-pre-line bg-[#FFFBF5]/40 p-5 rounded-2xl border border-teal-50"
               >
                 {activeCaption.description}
               </p>
             </div>
           </div>
         ) : (
-          <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#4338CA]/10 p-12 text-center shadow-sm">
-            <Eye className="w-16 h-16 text-[#312E81]/25 mx-auto mb-4" />
-            <h4 className="text-md font-bold text-[#312E81]">Graphic helper unoccupied</h4>
-            <p className="text-xs text-[#312E81]/60 max-w-xs mx-auto mt-1">
+          <div className="bg-white/60 backdrop-blur-md rounded-3xl border border-[#0F766E]/10 p-12 text-center shadow-sm">
+            <Eye className="w-16 h-16 text-[#134E4A]/25 mx-auto mb-4" />
+            <h4 className="text-md font-bold text-[#134E4A]">Graphic helper unoccupied</h4>
+            <p className="text-xs text-[#134E4A]/60 max-w-xs mx-auto mt-1">
               Select or drop any study textbook element, graph matrix, or flow-chart diagram to receive screen-reader transcribing blocks here.
             </p>
           </div>

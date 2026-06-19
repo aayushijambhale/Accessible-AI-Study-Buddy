@@ -27,24 +27,24 @@ export default function ShortcutCheatSheetModal({ onClose }: CheatSheetProps) {
   ];
 
   return (
-    <div id="cheat-sheet-modal" className="fixed inset-0 bg-[#312E81]/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-3xl border border-[#4338CA]/15 shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
+    <div id="cheat-sheet-modal" className="fixed inset-0 bg-[#134E4A]/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fadeIn" role="dialog" aria-modal="true">
+      <div className="bg-white rounded-3xl border border-[#0F766E]/15 shadow-2xl max-w-lg w-full overflow-hidden animate-scaleIn">
         
         {/* Header decoration */}
-        <div className="bg-[#F8FAFC] px-6 py-5 border-b border-[#4338CA]/10 flex justify-between items-center">
+        <div className="bg-[#FFFBF5] px-6 py-5 border-b border-[#0F766E]/10 flex justify-between items-center">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 bg-[#E6F4F1] text-[#4338CA] rounded-xl">
+            <div className="p-2 bg-[#E6F4F1] text-[#0F766E] rounded-xl">
               <HelpCircle className="w-5 h-5 animate-pulse" />
             </div>
             <div>
-              <h3 className="text-sm font-black text-[#312E81] uppercase tracking-wide">Interactive Shortcuts</h3>
-              <span className="text-[10px] text-[#4338CA]/80 font-bold block">Inclusive study help helper</span>
+              <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wide">Interactive Shortcuts</h3>
+              <span className="text-[10px] text-[#0F766E]/80 font-bold block">Inclusive study help helper</span>
             </div>
           </div>
           <button
             id="close-cheat-sheet-btn"
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-gray-900 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="p-1.5 hover:bg-gray-100 rounded-full transition-all text-gray-400 hover:text-gray-900 cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -54,17 +54,17 @@ export default function ShortcutCheatSheetModal({ onClose }: CheatSheetProps) {
         <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
           {categories.map((cat, ci) => (
             <div key={ci} className="space-y-3">
-              <h4 className="text-[10px] font-black uppercase text-[#6366F1] tracking-widest pl-1">{cat.title}</h4>
+              <h4 className="text-[10px] font-black uppercase text-[#14B8A6] tracking-widest pl-1">{cat.title}</h4>
               <div className="space-y-2">
                 {cat.items.map((item, ii) => {
                   const Icon = item.icon;
                   return (
-                    <div key={ii} className="flex justify-between items-start gap-4 p-3 bg-[#F8FAFC] rounded-2xl border border-[#4338CA]/5 hover:bg-white hover:border-[#6366F1]/20 hover:scale-[1.01] transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
+                    <div key={ii} className="flex justify-between items-start gap-4 p-3 bg-[#FFFBF5] rounded-2xl border border-[#0F766E]/5 hover:bg-white hover:border-[#14B8A6]/20 hover:scale-[1.01] transition-all">
                       <div className="flex items-center gap-2.5">
-                        <div className="p-1.5 bg-[#FFF] border border-orange-50/70 text-[#4338CA] rounded-lg shrink-0">
+                        <div className="p-1.5 bg-[#FFF] border border-orange-50/70 text-[#0F766E] rounded-lg shrink-0">
                           <Icon className="w-4 h-4" />
                         </div>
-                        <span className="text-xs font-bold text-[#312E81] leading-tight">{item.description}</span>
+                        <span className="text-xs font-bold text-[#134E4A] leading-tight">{item.description}</span>
                       </div>
                       
                       {/* Keyboard pill rendering */}
@@ -72,7 +72,7 @@ export default function ShortcutCheatSheetModal({ onClose }: CheatSheetProps) {
                         {item.keys.map((key, ki) => (
                           <span 
                             key={ki} 
-                            className="bg-white border-b-2 border-r-2 border-gray-200 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-[#312E81] shadow-xs uppercase tracking-wide font-mono shrink-0"
+                            className="bg-white border-b-2 border-r-2 border-gray-200 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-[#134E4A] shadow-xs uppercase tracking-wide font-mono shrink-0"
                           >
                             {key}
                           </span>
@@ -88,11 +88,11 @@ export default function ShortcutCheatSheetModal({ onClose }: CheatSheetProps) {
         </div>
 
         {/* Modal Actions Footer */}
-        <div className="bg-[#F8FAFC]/60 hover:bg-[#F8FAFC] p-4 border-t border-[#4338CA]/10 flex justify-end gap-2.5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500">
+        <div className="bg-[#FFFBF5]/60 hover:bg-[#FFFBF5] p-4 border-t border-[#0F766E]/10 flex justify-end gap-2.5">
           <button
             id="btn-close-shortcut-cheat-sheet"
             onClick={onClose}
-            className="px-5 py-2.5 bg-[#4338CA] hover:bg-[#312E81] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500 shadow-xs transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-indigo-500"
+            className="px-5 py-2.5 bg-[#0F766E] hover:bg-[#134E4A] text-white font-extrabold text-xs uppercase tracking-wider rounded-xl cursor-pointer shadow-xs transition-all"
           >
             Dismiss Help Guide
           </button>

@@ -1,31 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
-
-@theme {
-  --color-primary: #0F766E;
-  --color-accent: #14B8A6;
-  --color-background: #FFFBF5;
-  --color-card: #FFFFFF;
-  --color-text-main: #134E4A;
-  --color-text-light: #14B8A6;
-  --color-heading: #0F766E;
-}
-
-:root {
-  --primary: #0F766E;
-  --accent: #14B8A6;
-  --bg-color: #FFFBF5;
-  --card-bg: #FFFFFF;
-  --text-main: #134E4A;
-  --heading: #0F766E;
-  --radius-soft: 24px;
-}
-
-body {
-  background-color: var(--bg-color);
-  color: var(--text-main);
-  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
-}
 
 /* Accessibility Text Zoom Global overrides */
 .text-zoom-large {
@@ -36,74 +9,31 @@ body {
   font-size: 124% !important;
 }
 
-/* Dyslexia friendly font fallback */
-.dyslexia-font {
-  font-family: 'OpenDyslexic', 'Comic Sans MS', sans-serif !important;
-}
-
 /* High Contrast Override variables */
 .high-contrast-active {
-  filter: contrast(1.25) saturate(1.1);
-  background-color: #000 !important;
-  color: #fff !important;
+  filter: contrast(1.15) saturate(1.05);
 }
 .high-contrast-active * {
-  border-color: #fff !important;
-  text-shadow: none !important;
-}
-.high-contrast-active .bg-white {
-  background-color: #111 !important;
-  color: #fff !important;
+  border-color: rgba(15, 118, 110, 0.45) !important;
+  text-shadow: 0 0.5px 0.5px rgba(0, 0, 0, 0.05);
 }
 
-/* Removed frosted glass per instructions */
+/* Frosted glass helper */
+.frosted-glass {
+  background: rgba(255, 251, 245, 0.65) !important;
+  backdrop-filter: blur(12px) saturate(110%);
+  -webkit-backdrop-filter: blur(12px) saturate(110%);
+}
 
 .frosted-white-glass {
-  background: rgba(255, 255, 255, 0.8) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: var(--radius-soft);
-  box-shadow: 0 8px 32px rgba(15, 118, 110, 0.05);
-}
-
-/* Shared UI elements */
-.card-soft {
-  background-color: var(--card-bg);
-  border-radius: var(--radius-soft);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
-  border: 1px solid #E2E8F0;
-  transition: all 0.3s ease;
-}
-
-.card-soft:hover {
-  box-shadow: 0 8px 32px rgba(15, 118, 110, 0.1);
-  transform: translateY(-2px);
-}
-
-.btn-primary {
-  background-color: var(--primary);
-  color: white;
-  border-radius: 14px;
-  padding: 0.75rem 1.5rem;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.3);
-}
-
-.btn-primary:hover {
-  background-color: #4F46E5;
-  box-shadow: 0 6px 20px rgba(79, 70, 229, 0.4);
-  transform: translateY(-1px);
-}
-
-.btn-primary:focus-visible {
-  outline: 3px solid var(--accent);
-  outline-offset: 2px;
+  background: rgba(255, 255, 255, 0.6) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 /* Keyframes & Scrollbars style properties */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -112,16 +42,17 @@ body {
 }
 
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: rgba(15, 118, 110, 0.04);
+  background: rgba(15, 118, 110, 0.02);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(15, 118, 110, 0.2);
+  background: rgba(15, 118, 110, 0.15);
   border-radius: 99px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 118, 110, 0.4);
+  background: rgba(15, 118, 110, 0.3);
 }
+
