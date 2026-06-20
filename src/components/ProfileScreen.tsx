@@ -1,5 +1,24 @@
 import React, { useState, useEffect } from "react";
-import { User, Award, BookOpen, Clock, Brain, MessageSquare, ShieldCheck, Sparkles, AlertCircle, Database, Lock, Key, ChevronRight, ChevronDown, Layers, ShieldAlert, CheckCircle2 } from "lucide-react";
+import { 
+  User, 
+  Award, 
+  BookOpen, 
+  Clock, 
+  Brain, 
+  ShieldCheck, 
+  Sparkles, 
+  AlertCircle, 
+  Database, 
+  Lock, 
+  Key, 
+  Layers, 
+  CheckCircle2, 
+  Settings, 
+  ChevronDown, 
+  Sliders, 
+  TrendingUp, 
+  Heart
+} from "lucide-react";
 import { SpeechEngine } from "../utils/speech";
 import { VoicePreferences, UserProfile, DashboardAnalytics } from "../types";
 
@@ -8,21 +27,56 @@ interface ProfileProps {
   voicePref: VoicePreferences;
 }
 
+const AVAILABLE_AVATARS = ["🎓", "🚀", "🧠", "🧬", "🧪", "🪐", "🎨", "💻", "📚", "✨", "🏆", "🌟"];
+
 export default function ProfileScreen({ token, voicePref }: ProfileProps) {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [stats, setStats] = useState<DashboardAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Profile Editor Panel (Phase 2 Authenticated customization form state)
+  // Gamified Avatar selection state stored in localStorage
+  const [selectedAvatar, setSelectedAvatar] = useState(() => {
+    return localStorage.getItem("student-avatar-symbol") || "🎓";
+  });
+  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+
+  // Profile Editor Panel state
   const [editMode, setEditMode] = useState(false);
   const [editFullName, setEditFullName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState("");
 
-  // Phase 3 Secure Authentication and Database Schema States
+  // Technical diagnostic console states
+  const [showAdminConsole, setShowAdminConsole] = useState(false);
   const [activeSchemaTab, setActiveSchemaTab] = useState<"users" | "notes" | "quizzes" | "quizHistory" | "chatSessions">("users");
-  const [isJwtCardExpanded, setIsJwtCardExpanded] = useState(true);
+
+  const fetchProfileAndStats = async () => {
+    try {
+      setLoading(true);
+      const [profRes, statsRes] = await Promise.all([
+        fetch("/api/auth/profile", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/analytics", { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+
+      if (profRes.ok && statsRes.ok) {
+        const uData = await profRes.json();
+        const sData = await statsRes.json();
+        setUserProfile(uData);
+        setStats(sData);
+        setEditFullName(uData.fullName || "");
+        setEditEmail(uData.email || "");
+      }
+    } catch (err) {
+      console.error("Failed loading profile stats logs", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfileAndStats();
+  }, [token]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,40 +101,22 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
       setSaveSuccess(true);
       setUserProfile((prev) => prev ? { ...prev, fullName: editFullName, email: editEmail } : null);
       setEditMode(false);
-      SpeechEngine.speak("Profile credentials updated successfully.", voicePref);
+      SpeechEngine.speak("Profile credentials updated successfully and refreshed in the academic system.", voicePref);
       
       // Dispatch custom event to alert high-level header components
       window.dispatchEvent(new CustomEvent("profile-updated"));
     } catch (err: any) {
       setSaveError(err.message || "Operation failed.");
-      SpeechEngine.speak(`Error: ${err.message}`, voicePref);
+      SpeechEngine.speak(`Error updating profile: ${err.message}`, voicePref);
     }
   };
 
-  const fetchProfileAndStats = async () => {
-    try {
-      setLoading(true);
-      const [profRes, statsRes] = await Promise.all([
-        fetch("/api/auth/profile", { headers: { Authorization: `Bearer ${token}` } }),
-        fetch("/api/analytics", { headers: { Authorization: `Bearer ${token}` } })
-      ]);
-
-      if (profRes.ok && statsRes.ok) {
-        const uData = await profRes.json();
-        const sData = await statsRes.json();
-        setUserProfile(uData);
-        setStats(sData);
-      }
-    } catch (err) {
-      console.error("Failed loading profile stats logs", err);
-    } finally {
-      setLoading(false);
-    }
+  const handleAvatarChange = (avatar: string) => {
+    setSelectedAvatar(avatar);
+    localStorage.setItem("student-avatar-symbol", avatar);
+    setShowAvatarPicker(false);
+    SpeechEngine.speak(`Avatar updated to ${avatar}!`, voicePref);
   };
-
-  useEffect(() => {
-    fetchProfileAndStats();
-  }, [token]);
 
   const handleMouseEnterText = (label: string) => {
     if (voicePref.enabled) {
@@ -91,8 +127,12 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
   if (loading) {
     return (
       <div className="p-8 max-w-4xl mx-auto space-y-6">
-        <div className="h-10 w-48 bg-slate-200 rounded animate-pulse" />
-        <div className="h-40 bg-slate-100 rounded-3xl animate-pulse" />
+        <div className="h-10 w-48 bg-slate-200 rounded-3xl animate-pulse" />
+        <div className="h-44 bg-slate-100 rounded-3xl animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="h-64 bg-slate-50 rounded-3xl animate-pulse" />
+          <div className="h-64 bg-slate-50 rounded-3xl animate-pulse" />
+        </div>
       </div>
     );
   }
@@ -102,170 +142,278 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
   const quizzesTaken = stats?.quizCount ?? 0;
   const avgGrade = stats?.averageScore ?? 0;
 
-  // Gamified achievements list based on active conditions
+  // Gamified academic rank helper
+  let academicRank = "🌱 Rising Scholar";
+  let badgeAccent = "bg-emerald-50 text-emerald-800 border-emerald-200/50";
+  if (avgGrade >= 90) {
+    academicRank = "🎖️ Academic Olympian";
+    badgeAccent = "bg-amber-100 text-amber-900 border-amber-300 ring-2 ring-yellow-400/20";
+  } else if (avgGrade >= 80) {
+    academicRank = "🌟 Honor Roll Scholar";
+    badgeAccent = "bg-teal-50 text-teal-900 border-teal-250";
+  } else if (parseFloat(studyHours) >= 5) {
+    academicRank = "⚡ Focus Pioneer";
+    badgeAccent = "bg-indigo-100 text-indigo-900 border-indigo-200";
+  }
+
+  // Gamified achievements list
   const achievementsList = [
     {
       id: "inc-reader",
       title: "Inception Scholar",
-      desc: "Upload or parse your first educational lecture notes.",
+      desc: "Upload or parse your first educational lecture notes materials.",
       unlocked: totalNotes > 0,
-      badge: "📚"
+      badge: "📚",
+      color: "from-blue-50 to-indigo-50 border-blue-100 text-blue-900"
     },
     {
       id: "practice-titan",
       title: "Self-Tester Pro",
-      desc: "Complete at least one multi-choice practice quiz successfully.",
+      desc: "Complete at least one multi-choice practice quiz or assessment challenge.",
       unlocked: quizzesTaken > 0,
-      badge: "⚡"
+      badge: "⚡",
+      color: "from-amber-50 to-yellow-50 border-amber-100 text-amber-900"
     },
     {
       id: "tutor-scholar",
       title: "Pedagogic Companion",
-      desc: "Consult the conversational Tutor Study Buddy.",
-      unlocked: true, // Auto unlocked for trying the buddy app!
-      badge: "💬"
+      desc: "Consult the conversational Tutor Study Buddy for contextual reinforcement.",
+      unlocked: true,
+      badge: "💬",
+      color: "from-teal-50 to-emerald-50 border-teal-105 text-teal-900"
     },
     {
       id: "optics-master",
       title: "Universal Sight Guide",
-      desc: "Achieve optimal focus via high contrast or font zoom scaling guidelines.",
+      desc: "Achieve optimal focus via high contrast or custom zoom sizing guidelines.",
       unlocked: voicePref.contrastMode || voicePref.textZoom !== "normal",
-      badge: "👁️"
+      badge: "👁️",
+      color: "from-purple-50 to-pink-50 border-purple-100 text-purple-900"
     }
   ];
 
   return (
-    <div id="profile-screen" className="p-6 max-w-4xl mx-auto space-y-8">
+    <div id="profile-screen" className="p-4 md:p-6 max-w-4xl mx-auto space-y-8 animate-fadeIn">
       
-      {/* Student Badge Card */}
+      {/* 1. Student Identity Header Banner */}
       <div 
-        className="bg-gradient-to-br from-[#0F766E] to-[#14B8A6] text-white rounded-3xl p-8 relative overflow-hidden shadow-md"
+        className="bg-gradient-to-br from-[#0F766E] to-[#14B8A6] text-white rounded-3xl p-6 sm:p-8 relative overflow-hidden shadow-sm"
         onMouseEnter={() => handleMouseEnterText(`Student profile page. Account for ${userProfile?.fullName}.`)}
       >
+        {/* Abstract subtle background pattern */}
         <div className="absolute top-0 right-0 p-8 text-white/5 pointer-events-none">
-          <User className="w-48 h-48" />
+          <User className="w-56 h-56" />
         </div>
 
         <div className="relative z-10 flex flex-col sm:flex-row items-center gap-6">
-          <div className="w-20 h-20 bg-white/20 backdrop-blur-md border border-white/30 rounded-2xl flex items-center justify-center text-4xl shadow-inner font-extrabold text-white">
-            {userProfile?.fullName ? userProfile.fullName.charAt(0) : "S"}
+          {/* Custom Avatar Bubble with Quick Emoji Picker */}
+          <div className="relative group shrink-0">
+            <button
+              onClick={() => {
+                setShowAvatarPicker(!showAvatarPicker);
+                SpeechEngine.speak("Opening custom avatar emoji selector.", voicePref);
+              }}
+              title="Click to customize your student avatar symbol"
+              className="w-24 h-24 bg-white/15 backdrop-blur-md border-2 border-white/40 rounded-3xl flex items-center justify-center text-5xl shadow-lg hover:scale-105 hover:bg-white/20 transition-all cursor-pointer relative"
+            >
+              {selectedAvatar}
+              <div className="absolute -bottom-1 -right-1 bg-[#134E4A] text-white text-[9.5px] font-black px-2 py-0.5 rounded-full uppercase border border-white/25 scale-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                Change
+              </div>
+            </button>
+
+            {/* Emoji Avatar Bubble Picker HUD */}
+            {showAvatarPicker && (
+              <div className="absolute top-full left-0 mt-3 p-3 bg-white text-slate-800 rounded-2xl border border-gray-100 shadow-xl grid grid-cols-4 gap-2 z-50 animate-fadeIn min-w-[200px]">
+                <div className="col-span-4 text-[9px] font-black uppercase text-gray-400 tracking-wider mb-1 px-1 flex justify-between">
+                  <span>Choose Symbol</span>
+                  <button onClick={() => setShowAvatarPicker(false)} className="text-red-500 hover:text-red-800">Close ✕</button>
+                </div>
+                {AVAILABLE_AVATARS.map((emoji) => (
+                  <button
+                    key={emoji}
+                    onClick={() => handleAvatarChange(emoji)}
+                    className="p-1.5 hover:bg-teal-50 text-2xl rounded-xl transition-all cursor-pointer active:scale-95"
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <div className="text-center sm:text-left space-y-1">
-            <span className="text-[10px] bg-white/25 text-white font-extrabold uppercase px-2.5 py-1 rounded-full tracking-widest inline-block">
-              Learner Space Profile
-            </span>
-            <h2 className="text-2xl font-black">{userProfile?.fullName || "Guest Student"}</h2>
-            <p className="text-xs text-white/80 font-medium leading-relaxed">{userProfile?.email}</p>
+          <div className="text-center sm:text-left space-y-2">
+            <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2">
+              <span className="text-[10px] bg-white/20 text-white font-extrabold uppercase px-3 py-1 rounded-full tracking-widest inline-block border border-white/10">
+                Active Scholar Profile
+              </span>
+              <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full border ${badgeAccent}`}>
+                {academicRank}
+              </span>
+            </div>
+            
+            <h2 className="text-2xl sm:text-3xl font-black tracking-tight">{userProfile?.fullName || "Guest Student"}</h2>
+            <p className="text-xs text-white/80 font-medium font-mono">{userProfile?.email}</p>
           </div>
         </div>
       </div>
 
-      {/* Grid: Study Stats vs Achievements */}
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-        
-        {/* Academic statistics */}
-        <div className="md:col-span-5 space-y-6">
-          <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider block border-b border-[#0F766E]/10 pb-2">
-              Academic Audit
-            </h3>
-
-            <div className="grid grid-cols-1 gap-3">
-              <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
-                onMouseEnter={() => handleMouseEnterText(`Continuous study hours: ${studyHours}`)}
-              >
-                <div className="flex items-center gap-2 text-[#0F766E]">
-                  <Clock className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Study Hours</span>
-                </div>
-                <span className="text-lg font-black text-[#134E4A]">{studyHours} hrs</span>
-              </div>
-
-              <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
-                onMouseEnter={() => handleMouseEnterText(`Total summary materials: ${totalNotes}`)}
-              >
-                <div className="flex items-center gap-2 text-[#0F766E]">
-                  <BookOpen className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Lessons Saved</span>
-                </div>
-                <span className="text-lg font-black text-[#134E4A]">{totalNotes} docs</span>
-              </div>
-
-              <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
-                onMouseEnter={() => handleMouseEnterText(`Practice tests taken: ${quizzesTaken}`)}
-              >
-                <div className="flex items-center gap-2 text-[#0F766E]">
-                  <Brain className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Quiz Completed</span>
-                </div>
-                <span className="text-lg font-black text-[#134E4A]">{quizzesTaken} times</span>
-              </div>
-
-              <div 
-                className="flex justify-between items-center bg-[#FFFBF5]/40 p-4 rounded-2xl border border-orange-50"
-                onMouseEnter={() => handleMouseEnterText(`Average grading grade: ${avgGrade} percent`)}
-              >
-                <div className="flex items-center gap-2 text-[#0F766E]">
-                  <Award className="w-5 h-5 shrink-0" />
-                  <span className="text-xs font-bold text-[#134E4A]/80">Quiz Avg score</span>
-                </div>
-                <span className="text-lg font-black text-[#134E4A]">{avgGrade}%</span>
-              </div>
-            </div>
-          </div>
+      {/* 2. Key Academic Stats Hub */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 px-1">
+          <TrendingUp className="w-5 h-5 text-[#0F766E]" />
+          <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wider">Academic Overview Metrics</h3>
         </div>
 
-        {/* Gamified Achievements list card */}
-        <div className="md:col-span-7 space-y-6">
-          <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-            <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider block border-b border-[#0F766E]/10 pb-2">
-              Achievements Badges ({achievementsList.filter(a => a.unlocked).length} / {achievementsList.length})
-            </h3>
-
-            <div className="space-y-3">
-              {achievementsList.map((ach) => (
-                <div 
-                  key={ach.id}
-                  onMouseEnter={() => handleMouseEnterText(`${ach.title}. status: ${ach.unlocked ? "unlocked" : "locked"}. ${ach.desc}`)}
-                  className={`flex items-start gap-3.5 p-4 rounded-2xl border transition-all ${
-                    ach.unlocked
-                      ? "bg-[#FFFBF5]/60 border-[#14B8A6]/20 text-[#134E4A]"
-                      : "bg-gray-50/50 border-gray-100 opacity-50 text-[#134E4A]/60"
-                  }`}
-                >
-                  <div className="text-2xl p-2.5 bg-white rounded-xl shadow-xs shrink-0 flex items-center justify-center border border-gray-100">
-                    {ach.badge}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-1.5 leading-snug">
-                      <span className="text-xs font-extrabold text-[#134E4A]">{ach.title}</span>
-                      {ach.unlocked && (
-                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-full">
-                          Unlocked
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[10.5px] leading-relaxed opacity-85 text-[#134E4A]/90 mt-1 font-semibold">{ach.desc}</p>
-                  </div>
-                </div>
-              ))}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          
+          {/* Stat 1: Study hours */}
+          <div 
+            className="bg-white p-5 rounded-2xl border border-[#0F766E]/10 flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-xs transition-shadow duration-250 cursor-pointer"
+            onClick={() => SpeechEngine.speak(`You completed ${studyHours} total study hours inside the workspace modules.`, voicePref)}
+            onMouseEnter={() => handleMouseEnterText(`Continuous study hours: ${studyHours}`)}
+          >
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wide">Continuous Time</span>
+              <div className="p-1.5 bg-[#0F766E]/5 text-[#0F766E] rounded-lg">
+                <Clock className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-[#134E4A] tracking-tight">{studyHours}</span>
+              <span className="text-xs font-bold text-gray-400 block mt-0.5">Hours Invested</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="bg-[#14B8A6] h-full rounded-full" style={{ width: `${Math.min(parseFloat(studyHours) * 20, 100)}%` }}></div>
             </div>
           </div>
-        </div>
 
+          {/* Stat 2: Lessons parsed */}
+          <div 
+            className="bg-white p-5 rounded-2xl border border-[#0F766E]/10 flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-xs transition-shadow duration-250 cursor-pointer"
+            onClick={() => SpeechEngine.speak(`You have saved ${totalNotes} study syllabus documents.`, voicePref)}
+            onMouseEnter={() => handleMouseEnterText(`Total summary materials: ${totalNotes}`)}
+          >
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wide">Course Library</span>
+              <div className="p-1.5 bg-[#0F766E]/5 text-[#0F766E] rounded-lg">
+                <BookOpen className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-[#134E4A] tracking-tight">{totalNotes}</span>
+              <span className="text-xs font-bold text-gray-400 block mt-0.5">Saved Material</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="bg-[#0F766E] h-full rounded-full" style={{ width: `${Math.min(totalNotes * 15, 100)}%` }}></div>
+            </div>
+          </div>
+
+          {/* Stat 3: Quizzes Completed */}
+          <div 
+            className="bg-white p-5 rounded-2xl border border-[#0F766E]/10 flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-xs transition-shadow duration-250 cursor-pointer"
+            onClick={() => SpeechEngine.speak(`You completed ${quizzesTaken} assessments.`, voicePref)}
+            onMouseEnter={() => handleMouseEnterText(`Completed interactive challenge assessments: ${quizzesTaken}`)}
+          >
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wide">Trial Exercises</span>
+              <div className="p-1.5 bg-[#0F766E]/5 text-[#0F766E] rounded-lg">
+                <Brain className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-[#134E4A] tracking-tight">{quizzesTaken}</span>
+              <span className="text-xs font-bold text-gray-400 block mt-0.5">Challenges Checked</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="bg-[#14B8A6] h-full rounded-full" style={{ width: `${Math.min(quizzesTaken * 25, 100)}%` }}></div>
+            </div>
+          </div>
+
+          {/* Stat 4: Average Score */}
+          <div 
+            className="bg-white p-5 rounded-2xl border border-[#0F766E]/10 flex flex-col justify-between space-y-3 shadow-2xs hover:shadow-xs transition-shadow duration-250 cursor-pointer"
+            onClick={() => SpeechEngine.speak(`Your average grade rating is ${avgGrade} percent.`, voicePref)}
+            onMouseEnter={() => handleMouseEnterText(`Average test grading score: ${avgGrade} percent`)}
+          >
+            <div className="flex justify-between items-start">
+              <span className="text-[10px] text-gray-500 font-extrabold uppercase tracking-wide">Class Grading</span>
+              <div className="p-1.5 bg-[#0F766E]/5 text-[#14B8A6] rounded-lg">
+                <Award className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <span className="text-2xl font-black text-[#134E4A] tracking-tight">{avgGrade}%</span>
+              <span className="text-xs font-bold text-gray-400 block mt-0.5">Average Correct</span>
+            </div>
+            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+              <div className="bg-[#0F766E] h-full rounded-full" style={{ width: `${avgGrade}%` }}></div>
+            </div>
+          </div>
+
+        </div>
       </div>
 
-      {/* Profile Settings Section (Phase 2 Authenticated customization form) */}
-      <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-        <div className="flex justify-between items-center border-b border-[#0F766E]/10 pb-2">
+      {/* 3. Achievements & Badges Bento Section */}
+      <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 space-y-5 shadow-2xs">
+        <div className="flex items-center justify-between border-b border-gray-100 pb-3">
           <div className="flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-[#0F766E]" />
-            <h3 className="text-sm font-bold text-[#134E4A] uppercase tracking-wider">
-              Profile Settings (Phase 2)
+            <Sparkles className="text-amber-500 w-5 h-5" />
+            <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wider">
+              Earned Badges ({achievementsList.filter(a => a.unlocked).length} / {achievementsList.length})
+            </h3>
+          </div>
+          <span className="text-[10px] text-[#0F766E] bg-teal-50 px-2.5 py-1 rounded-full font-bold uppercase tracking-wider">
+            Academic Achievements
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {achievementsList.map((ach) => (
+            <div 
+              key={ach.id}
+              onMouseEnter={() => handleMouseEnterText(`${ach.title}. status: ${ach.unlocked ? "unlocked" : "locked"}. ${ach.desc}`)}
+              className={`flex items-start gap-4 p-4 rounded-2xl border transition-all duration-300 relative overflow-hidden group ${
+                ach.unlocked
+                  ? `bg-gradient-to-r ${ach.color} shadow-2xs hover:shadow-xs hover:scale-[1.01]`
+                  : "bg-slate-50 border-slate-100 opacity-55 text-[#134E4A]/50"
+              }`}
+            >
+              {/* Decorative side accent for unlocked badges */}
+              {ach.unlocked && (
+                <div className="absolute top-0 bottom-0 left-0 w-1 bg-[#14B8A6]/60"></div>
+              )}
+
+              <div className="text-3xl p-3 bg-white rounded-xl shadow-2xs shrink-0 flex items-center justify-center border border-gray-150 transition-transform duration-300 group-hover:scale-105">
+                {ach.badge}
+              </div>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs font-black text-[#134E4A]">{ach.title}</span>
+                  {ach.unlocked ? (
+                    <span className="text-[8px] bg-emerald-500/10 text-emerald-800 border border-emerald-500/20 font-black uppercase px-2 py-0.5 rounded-full tracking-widest scale-90">
+                      Unlocked
+                    </span>
+                  ) : (
+                    <span className="text-[8px] bg-slate-200/60 text-slate-500 border border-slate-300/40 font-black uppercase px-2 py-0.5 rounded-full tracking-widest scale-90">
+                      Locked
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] leading-relaxed opacity-90 text-[#134E4A]/80 font-medium">{ach.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* 4. Accounts Form Preferences Card */}
+      <div className="bg-white p-6 rounded-3xl border border-[#0F766E]/10 space-y-4 shadow-2xs">
+        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+          <div className="flex items-center gap-2">
+            <Sliders className="w-5 h-5 text-[#0F766E]" />
+            <h3 className="text-sm font-black text-[#134E4A] uppercase tracking-wider">
+              Profile Settings & Credentials
             </h3>
           </div>
           <button
@@ -276,36 +424,37 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                 setEditEmail(userProfile?.email || "");
                 setSaveSuccess(false);
                 setSaveError("");
-                SpeechEngine.speak("Editing profile enabled. Change credentials as desired.", voicePref);
+                SpeechEngine.speak("Editing profile enabled. Make changes to your display credentials.", voicePref);
               } else {
                 SpeechEngine.speak("Editing profile cancelled.", voicePref);
               }
               setEditMode(!editMode);
             }}
-            className="text-xs bg-[#0F766E]/10 text-[#0F766E] hover:bg-[#0F766E] hover:text-white font-bold px-3.5 py-1.5 rounded-xl transition-all cursor-pointer"
+            className="text-xs bg-[#0F766E]/10 text-[#0F766E] hover:bg-[#0F766E] hover:text-white font-extrabold px-3.5 py-1.5 rounded-xl transition-colors cursor-pointer"
           >
-            {editMode ? "Cancel" : "Edit Profile Info"}
+            {editMode ? "Cancel Changes" : "Edit Profile Info"}
           </button>
         </div>
 
         {saveSuccess && (
-          <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-center gap-2 border border-emerald-100 font-medium">
-            <span className="font-extrabold">✓</span> Profile updated successfully and synced securely with the secure study database!
+          <div className="p-3 bg-emerald-50 text-emerald-800 text-xs rounded-xl flex items-center gap-2 border border-emerald-100 font-bold animate-fadeIn">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Profile updated successfully and synced securely with the study database!</span>
           </div>
         )}
 
         {saveError && (
-          <div className="p-3 bg-red-50 text-red-800 text-xs rounded-xl flex items-center gap-2 border border-red-100">
-            <AlertCircle className="w-5 h-5 shrink-0" />
-            <span>{saveError}</span>
+          <div className="p-3 bg-red-50 text-red-800 text-xs rounded-xl flex items-center gap-2 border border-red-100 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span className="font-semibold">{saveError}</span>
           </div>
         )}
 
         {editMode ? (
-          <form onSubmit={handleSaveProfile} className="space-y-4">
+          <form onSubmit={handleSaveProfile} className="space-y-4 pt-1 animate-fadeIn">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label htmlFor="edit-fullName" className="text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label htmlFor="edit-fullName" className="text-[10px] font-black text-[#134E4A]/70 uppercase tracking-widest pl-1">
                   Full Name / Student Alias
                 </label>
                 <input
@@ -314,12 +463,13 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   required
                   value={editFullName}
                   onChange={(e) => setEditFullName(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
+                  placeholder="e.g. Aayushi"
+                  className="w-full px-4 py-2.5 text-xs font-bold bg-slate-50 border border-gray-200 focus:bg-white focus:outline-hidden focus:border-[#0F766E] rounded-xl text-[#134E4A] transition-all placeholder:text-gray-400"
                 />
               </div>
 
-              <div className="space-y-1">
-                <label htmlFor="edit-email" className="text-xs font-bold text-[#134E4A]/70 uppercase tracking-wider">
+              <div className="space-y-1.5">
+                <label htmlFor="edit-email" className="text-[10px] font-black text-[#134E4A]/70 uppercase tracking-widest pl-1">
                   Email Address
                 </label>
                 <input
@@ -328,331 +478,262 @@ export default function ProfileScreen({ token, voicePref }: ProfileProps) {
                   required
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full px-4 py-2.5 text-sm bg-white border border-[#0F766E]/10 focus:outline-none focus:border-[#0F766E] rounded-xl text-[#134E4A]"
+                  placeholder="name@university.edu"
+                  className="w-full px-4 py-2.5 text-xs font-bold bg-slate-50 border border-gray-200 focus:bg-white focus:outline-hidden focus:border-[#0F766E] rounded-xl text-[#134E4A] transition-all placeholder:text-gray-400"
                 />
               </div>
             </div>
 
-            <button
-              id="profile-btn-save"
-              type="submit"
-              className="px-6 py-2.5 bg-[#0F766E] hover:bg-[#134E4A] text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
-            >
-              Save Account Changes
-            </button>
+            <div className="flex justify-end pt-1">
+              <button
+                id="profile-btn-save"
+                type="submit"
+                className="px-5 py-2 bg-[#0F766E] hover:bg-[#134E4A] text-white text-[10.5px] font-black uppercase tracking-widest rounded-xl shadow-xs hover:shadow-sm transition-all cursor-pointer"
+              >
+                Save Account Changes
+              </button>
+            </div>
           </form>
         ) : (
-          <div className="text-xs space-y-2 opacity-80">
-            <div className="flex justify-between items-center bg-[#FFFBF5]/40 p-3.5 rounded-2xl border border-orange-50">
-              <span className="font-bold text-[#134E4A]/80">Credential Verify Level</span>
-              <span className="font-extrabold text-[#0F766E]">Fully Enrolled / Verified</span>
+          <div className="text-xs space-y-3 pt-1">
+            <div className="flex justify-between items-center bg-[#FFFBF5]/75 p-3.5 rounded-2xl border border-orange-50/60 font-semibold">
+              <span className="text-[#134E4A]/70">Credential Enroller Verify State</span>
+              <span className="font-extrabold text-[#0F766E] flex items-center gap-1">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Fully Certified
+              </span>
             </div>
-            <p className="leading-relaxed font-semibold">Changes made to your credentials will sync and update immediately across the entire workspace, including the customized header display.</p>
+            <p className="leading-relaxed font-semibold text-gray-500 pl-1">
+              Changes made to your credentials will sync and update immediately across the entire workspace, including the customized header display.
+            </p>
           </div>
         )}
       </div>
 
-      {/* PHASE 3: SECURE SESSION & DATABASE SCHEMA CONTROLS */}
-      <div className="space-y-6">
-        
-        {/* Real-time JWT Session Metadata & Bcrypt Encryption Inspector */}
-        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-          <div className="flex justify-between items-center border-b border-[#0F766E]/10 pb-3">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-[#0F766E]/10 rounded-xl text-[#0F766E]">
-                <Lock className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">
-                  Session Token & Password Security (Phase 3)
-                </h3>
-                <span className="text-[10px] text-[#0F766E] font-bold uppercase tracking-widest">JWT Authorization & Bcrypt Shield</span>
-              </div>
-            </div>
-            <button
-              id="profile-btn-jwt-toggle"
-              onClick={() => {
-                const nextVal = !isJwtCardExpanded;
-                setIsJwtCardExpanded(nextVal);
-                SpeechEngine.speak(nextVal ? "Revealed cryptography session credentials." : "Cryptographic session inspector collapsed.", voicePref);
-              }}
-              className="p-1 px-3 py-1 bg-[#FFFBF5] hover:bg-[#0F766E]/10 border border-[#0F766E]/15 rounded-xl text-xs font-bold text-[#0F766E] cursor-pointer"
-            >
-              {isJwtCardExpanded ? "Hide Details" : "Inspect Credentials"}
-            </button>
-          </div>
-
-          {isJwtCardExpanded && (
-            <div className="space-y-4 animate-fadeIn">
-              
-              {/* Twin visual layout: Encryption status & Token signature decoder */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                
-                {/* 1. Bcrypt Password Encryption Info */}
-                <div 
-                  className="bg-[#FFFBF5]/70 p-4 rounded-2xl border border-orange-50 space-y-3"
-                  onMouseEnter={() => handleMouseEnterText("Credentials are fully protected using Blowfish cipher bcrypt signature with 10 standard salt strength rounds.")}
-                >
-                  <div className="flex items-center gap-2 text-[#0F766E]">
-                    <ShieldCheck className="w-4.5 h-4.5 text-emerald-600" />
-                    <span className="text-xs font-black uppercase text-[#134E4A]">Password Salt Shield</span>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <p className="font-semibold text-gray-700 leading-relaxed">
-                      All student passwords are systematically encrypted on the backend server before disk storage.
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 pt-1 font-bold">
-                      <div className="bg-white/60 p-2 rounded-xl text-center border border-[#0F766E]/5">
-                        <span className="text-[10px] text-[#0F766E] block uppercase">Hash Cipher</span>
-                        <span className="text-xs text-[#134E4A]">Blowfish Bcrypt</span>
-                      </div>
-                      <div className="bg-white/60 p-2 rounded-xl text-center border border-[#0F766E]/5">
-                        <span className="text-[10px] text-[#0F766E] block uppercase">Salt Rounds</span>
-                        <span className="text-xs text-[#134E4A]">10 Rounds</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. active JWT Session Life progress tracker */}
-                <div 
-                  className="bg-[#FFFBF5]/70 p-4 rounded-2xl border border-orange-50 space-y-3"
-                  onMouseEnter={() => handleMouseEnterText("Active student session status is managed secure by cloud web tokens with a default thirty days expiration timescale.")}
-                >
-                  <div className="flex items-center gap-2 text-[#0F766E]">
-                    <Key className="w-4.5 h-4.5 text-amber-600" />
-                    <span className="text-xs font-black uppercase text-[#134E4A]">JWT Authenticated life</span>
-                  </div>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex justify-between font-bold text-[#134E4A]/80">
-                      <span>Token Lifetime Status</span>
-                      <span className="text-emerald-700">Active (30-day term)</span>
-                    </div>
-                    {/* Visual Progress Bar */}
-                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                      <div className="bg-emerald-600 h-full rounded-full transition-all" style={{ width: "98%" }}></div>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] uppercase tracking-wider font-extrabold text-gray-500">
-                      <span>Session Started</span>
-                      <span>98% Expiry Remain</span>
-                    </div>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* 3. Secure live JWT Token Payload Decrypter (No Mock data payload - parsed directly from local JWT token!) */}
-              <div className="bg-slate-900 text-slate-100 rounded-2xl p-4 space-y-3 font-mono text-[11px] border border-slate-800">
-                <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-                  <div className="flex items-center gap-2 text-emerald-400">
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span className="font-bold text-xs uppercase tracking-wider">Live Decoded JWT Payload (Client-Side Sandboxed Decoding)</span>
-                  </div>
-                  <span className="bg-emerald-500/10 text-emerald-400 text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    HMAC-SHA256 signature Verified
-                  </span>
-                </div>
-                
-                {(() => {
-                  try {
-                    const parts = token.split(".");
-                    if (parts.length !== 3) {
-                      return <p className="text-red-400">Unable to locate three-part structure of active study session token.</p>;
-                    }
-                    const base64Url = parts[1];
-                    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
-                    const jsonPayload = decodeURIComponent(
-                      window.atob(base64)
-                        .split("")
-                        .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
-                        .join("")
-                    );
-                    const decoded = JSON.parse(jsonPayload);
-                    return (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 leading-relaxed">
-                        <div className="space-y-1">
-                          <span className="text-slate-500 block uppercase font-bold text-[9px] tracking-widest">Active Client Bearer Context:</span>
-                          <span className="text-sky-300 block break-all">id: "{decoded.id}"</span>
-                          <span className="text-emerald-300 block break-all">email: "{decoded.email}"</span>
-                        </div>
-                        <div className="space-y-1">
-                          <span className="text-slate-500 block uppercase font-bold text-[9px] tracking-widest font-mono">Issued timestamps:</span>
-                          <span className="text-amber-300 block">Issued at (iat): {decoded.iat ? new Date(decoded.iat * 1000).toLocaleString() : "N/A"}</span>
-                          <span className="text-rose-300 block">Expires at (exp): {decoded.exp ? new Date(decoded.exp * 1000).toLocaleString() : "N/A"}</span>
-                        </div>
-                      </div>
-                    );
-                  } catch (err) {
-                    return <p className="text-orange-400">Session token decoding failed.</p>;
-                  }
-                })()}
-
-                <div className="bg-slate-950 p-2.5 rounded-xl text-slate-400 border border-slate-900 leading-normal text-[10px]">
-                  <span className="text-amber-400 font-extrabold text-[11px] block mb-0.5">🔒 PROTECTED ROUTING RULES ACTIVE:</span>
-                  Requests to server endpoints <code className="text-slate-200">/api/notes</code>, <code className="text-slate-200">/api/quizzes</code>, and <code className="text-slate-200">/api/analytics</code> automatically reject with <code className="text-rose-400 font-bold">401 Unauthorized</code> unless decrypted via HMAC-SHA256 protocol verification matches.
-                </div>
-              </div>
-
-            </div>
-          )}
-        </div>
-
-        {/* Dynamic Database Schema Catalog Relational Browser */}
-        <div className="bg-white/60 backdrop-blur-md rounded-3xl p-6 border border-[#0F766E]/10 space-y-4 shadow-xs">
-          <div className="flex items-center gap-2.5 border-b border-[#0F766E]/10 pb-3">
-            <div className="p-2 bg-[#0F766E]/10 rounded-xl text-[#0F766E]">
-              <Database className="w-5 h-5" />
-            </div>
+      {/* 5. Sleek / Collapsed Diagnostic Panel for Systems & Database auditing */}
+      <div className="bg-[#FFFBF5]/40 border border-[#0F766E]/10 rounded-3xl overflow-hidden p-6 shadow-3xs space-y-4">
+        <div className="flex items-center justify-between border-b border-gray-150 pb-3">
+          <div className="flex items-center gap-2">
+            <Settings className="w-4 h-4 text-slate-500" />
             <div>
-              <h3 className="text-sm font-extrabold text-[#134E4A] uppercase tracking-wider">
-                Relational Database Schemas Catalog (Phase 3)
-              </h3>
-              <span className="text-[10px] text-[#0F766E] font-bold uppercase tracking-widest">Verified Relational Properties & Database Fields</span>
+              <h4 className="text-xs font-black text-slate-700 uppercase tracking-widest">System Audit & Diagnostics Console</h4>
+              <p className="text-[10px] text-gray-400 font-bold">Inspect credential structures, token configurations, and SQL schemas</p>
             </div>
           </div>
-
-          <p className="text-xs font-semibold text-[#134E4A]/80 leading-relaxed">
-            The data storage framework maps to the following structured repository tables. Each record persists securely and relates chronologically back to the certified User primary key.
-          </p>
-
-          {/* Table Select Tabs */}
-          <div className="flex flex-wrap gap-2">
-            {(["users", "notes", "quizzes", "quizHistory", "chatSessions"] as const).map((tab) => {
-              const isActive = activeSchemaTab === tab;
-              const displayLabels: Record<string, string> = {
-                users: "Users Model",
-                notes: "Notes Model",
-                quizzes: "Quizzes Model",
-                quizHistory: "Quiz History",
-                chatSessions: "AI Chats Logs"
-              };
-              return (
-                <button
-                  id={`btn-schema-tab-${tab}`}
-                  key={tab}
-                  onClick={() => {
-                    setActiveSchemaTab(tab);
-                    SpeechEngine.speak(`Displaying database fields for ${displayLabels[tab]}.`, voicePref);
-                  }}
-                  className={`text-xs font-extrabold px-3.5 py-2 rounded-xl transition-all cursor-pointer ${
-                    isActive
-                      ? "bg-[#0F766E] text-white shadow-xs"
-                      : "bg-[#FFFBF5] text-[#0F766E] hover:bg-[#0F766E]/10 border border-[#0F766E]/10"
-                  }`}
-                >
-                  {displayLabels[tab]}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Displays dynamic schema content of selected tab */}
-          <div className="p-4 bg-[#FFFBF5]/70 rounded-2xl border border-orange-50 space-y-3 animate-fadeIn">
-            
-            {(() => {
-              const schemasInfo = {
-                users: {
-                  title: "Users Relational Model Schema",
-                  description: "Registers student configuration credentials linked with high-performance bcrypt hashed credentials.",
-                  fields: [
-                    { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Unique index identifier (Numerical string)" },
-                    { key: "email", type: "VARCHAR(255) (UNIQUE KEY)", desc: "Verified student login email key" },
-                    { key: "passwordHash", type: "VARCHAR(60)", desc: "Locked code signature generated securely via bcrypt hash helper" },
-                    { key: "fullName", type: "VARCHAR(255)", desc: "Full text Student display label" },
-                    { key: "voiceSettings", type: "JSONB", desc: "User configuration preferences (contrast mode, pitch, zoom, disabled read aloud)" },
-                    { key: "studyHours", type: "DECIMAL(5,2)", desc: "Chronological minutes calculated as decimal hours with automatic addition" }
-                  ]
-                },
-                notes: {
-                  title: "Notes Persistent Model Schema",
-                  description: "Saves verified uploaded summaries and materials extracted from files.",
-                  fields: [
-                    { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Notes document key" },
-                    { key: "userId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Links Note back to appropriate verified Users.id profile" },
-                    { key: "title", type: "VARCHAR(255)", desc: "Selected document title descriptor" },
-                    { key: "rawContent", type: "TEXT", desc: "Raw prompts / custom pasted notes values" },
-                    { key: "summary", type: "TEXT (Markdown summary format)", desc: "AI-generated Markdown overview blocks" },
-                    { key: "bulletPoints", type: "JSONB_ARRAY", desc: "List of condensed high-priority learnings" },
-                    { key: "easyExplanation", type: "TEXT", desc: "Simplified layperson explanation terms" },
-                    { key: "examNotes", type: "TEXT", desc: "Targeted flash summaries containing key test topics" },
-                    { key: "keyDefinitions", type: "JSONB_ARRAY", desc: "Highlighted definition lookup pairs (term and definition link)" }
-                  ]
-                },
-                quizzes: {
-                  title: "Quizzes Dynamic Model Schema",
-                  description: "Includes multiple choice interactive trivia and review challenges generated on-demand.",
-                  fields: [
-                    { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Interactive evaluation unique key" },
-                    { key: "noteId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Associates practice challenge package to origin Notes.id" },
-                    { key: "userId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Assigned student profile target matching link" },
-                    { key: "title", type: "VARCHAR(255)", desc: "Topic identifier for the examination" },
-                    { key: "questions", type: "JSONB_OBJECT_ARRAY", desc: "Questions array detailing options, correctAnswer value, and educational trivia explanations" }
-                  ]
-                },
-                quizHistory: {
-                  title: "QuizHistory Grades Tracking Schema",
-                  description: "Saves historic performance records and academic progress timeline logs.",
-                  fields: [
-                    { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Historic entry primary identifier code" },
-                    { key: "quizId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Linked evaluation exam target pointer" },
-                    { key: "userId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Student candidate account ID mapping" },
-                    { key: "title", type: "VARCHAR(255)", desc: "Quiz evaluation label" },
-                    { key: "score", type: "SMALLINT", desc: "Total correct choices checked by candidate" },
-                    { key: "totalQuestions", type: "SMALLINT", desc: "Max test questions capacity" },
-                    { key: "percentage", type: "DECIMAL(5,2)", desc: "Final recorded score percentile grade scale" }
-                  ]
-                },
-                chatSessions: {
-                  title: "ChatSessions Conversational Timeline Schema",
-                  description: "Tracks text-based conversational tutoring messages and historical chats with the AI companion.",
-                  fields: [
-                    { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Session storage unique reference identifier key" },
-                    { key: "userId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Points back to appropriate verified student User ID" },
-                    { key: "noteId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Provides targeted focus context linking to Notes.id" },
-                    { key: "messages", type: "JSONB_ARRAY", desc: "Timestamp sequential list tracking sender category (user/ai) and dialog strings" }
-                  ]
-                }
-              };
-
-              const activeSchemaObj = schemasInfo[activeSchemaTab];
-
-              return (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-[#134E4A]">
-                    <Layers className="w-4 h-4 text-[#0F766E]" />
-                    <h4 className="text-xs font-extrabold uppercase tracking-wider">{activeSchemaObj.title}</h4>
-                  </div>
-                  <p className="text-[10.5px] text-[#134E4A]/80 font-bold mb-2 italic">
-                    "{activeSchemaObj.description}"
-                  </p>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-[10px] text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-[#0F766E]/20 text-[#0F766E]/80 uppercase font-black tracking-widest bg-emerald-500/5">
-                          <th className="py-2.5 px-3">Field Key Name</th>
-                          <th className="py-2.5 px-3">Relational Type / Format</th>
-                          <th className="py-2.5 px-3">Field Usage & Safeguard Description</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-[#0F766E]/5">
-                        {activeSchemaObj.fields.map((field) => (
-                          <tr key={field.key} className="hover:bg-teal-50/20 font-semibold text-[#134E4A]">
-                            <td className="py-2 px-3 text-[#0F766E] font-bold font-mono">{field.key}</td>
-                            <td className="py-2 px-3 text-slate-600 font-bold text-[9px] font-mono">{field.type}</td>
-                            <td className="py-2 px-3 text-[10.5px] font-bold text-gray-700 leading-normal">{field.desc}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              );
-            })()}
-
-          </div>
+          <button
+            onClick={() => {
+              const toggleState = !showAdminConsole;
+              setShowAdminConsole(toggleState);
+              SpeechEngine.speak(toggleState ? "Developer console activated." : "Developer console hidden.", voicePref);
+            }}
+            className="text-[9.5px] font-black text-[#0F766E] bg-white border border-[#0F766E]/10 px-3.5 py-1.5 rounded-xl hover:bg-teal-50/50 transition-colors cursor-pointer uppercase tracking-wider"
+          >
+            {showAdminConsole ? "Hide Diagnostics ✕" : "Expand Console ⚙️"}
+          </button>
         </div>
 
+        {showAdminConsole && (
+          <div className="space-y-6 animate-fadeIn pt-2">
+            
+            {/* Cryptographic Session & JWT Payload decoder */}
+            <div className="space-y-3 bg-slate-900 text-slate-100 rounded-2xl p-4 border border-slate-850 font-mono text-xs">
+              <div className="flex justify-between items-center border-b border-slate-800 pb-2">
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <Key className="w-4 h-4" />
+                  <span className="font-bold text-[10px] uppercase tracking-wider">Active Cryptographic Context</span>
+                </div>
+                <span className="bg-emerald-500/10 text-emerald-400 text-[8.5px] font-bold uppercase tracking-widest px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                  HMAC-SHA256 SIGNED
+                </span>
+              </div>
+
+              {/* Password encrypt parameters */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-[10.5px] leading-relaxed p-1 bg-slate-950/40 rounded-xl">
+                <div className="space-y-1 bg-slate-950/60 p-3 rounded-lg border border-slate-900">
+                  <span className="text-slate-500 block uppercase font-bold text-[9px] tracking-widest">Password Shield Encryption</span>
+                  <p className="font-semibold text-slate-300">
+                    All passwords hashed using Blowfish cipher crypt.
+                  </p>
+                  <div className="flex gap-4 pt-1 font-bold text-[10px] text-emerald-300">
+                    <span>Algorithm: BCrypt</span>
+                    <span>Salt Work: 10 Rounds</span>
+                  </div>
+                </div>
+
+                <div className="space-y-1 bg-slate-950/60 p-3 rounded-lg border border-slate-900">
+                  <span className="text-slate-500 block uppercase font-bold text-[9px] tracking-widest">JWT Authorization Life</span>
+                  <p className="font-semibold text-slate-300">
+                    Secure Web Token valid for 30 consecutive days.
+                  </p>
+                  <div className="flex justify-between text-[10px] text-sky-305 pt-1">
+                    <span>Session term state: Active</span>
+                    <span className="text-emerald-400">98% valid life remaining</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* decoded token keys */}
+              {(() => {
+                try {
+                  const parts = token.split(".");
+                  if (parts.length !== 3) {
+                    return <p className="text-red-400">Unable to locate normal 3-part token payload structures.</p>;
+                  }
+                  const base64Url = parts[1];
+                  const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+                  const jsonPayload = decodeURIComponent(
+                    window.atob(base64)
+                      .split("")
+                      .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+                      .join("")
+                  );
+                  const decoded = JSON.parse(jsonPayload);
+                  return (
+                    <div className="space-y-2 p-3 bg-slate-950 rounded-xl border border-slate-920">
+                      <div className="text-[9.5px] text-slate-500 font-bold uppercase tracking-widest">Decoded Client Bearer Information:</div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px]">
+                        <div className="space-y-0.5">
+                          <span className="text-sky-305 block break-all">id: "{decoded.id}"</span>
+                          <span className="text-emerald-355 block break-all">email: "{decoded.email}"</span>
+                        </div>
+                        <div className="space-y-0.5 sm:text-right">
+                          <span className="text-amber-305 block">Issued: {decoded.iat ? new Date(decoded.iat * 1000).toLocaleTimeString() : "N/A"}</span>
+                          <span className="text-rose-305 block">Expires: {decoded.exp ? new Date(decoded.exp * 1000).toLocaleDateString() : "N/A"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                } catch {
+                  return <p className="text-orange-400">Authorization parsing is unavailable.</p>;
+                }
+              })()}
+            </div>
+
+            {/* Structured Table Schema Information Tabs */}
+            <div className="space-y-3.5 bg-white p-5 rounded-2xl border border-gray-200/60 shadow-3xs">
+              <div className="flex items-center gap-2 border-b border-gray-100 pb-2">
+                <Database className="w-4 h-4 text-slate-500" />
+                <span className="text-xs font-black text-slate-700 uppercase tracking-widest">Active PostgreSQL Tables schemas</span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 font-sans">
+                {(["users", "notes", "quizzes", "quizHistory", "chatSessions"] as const).map((tab) => {
+                  const isActive = activeSchemaTab === tab;
+                  const displayLabels: Record<string, string> = {
+                    users: "users",
+                    notes: "notes",
+                    quizzes: "quizzes",
+                    quizHistory: "quiz_history",
+                    chatSessions: "chat_sessions"
+                  };
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setActiveSchemaTab(tab)}
+                      className={`text-[9.5px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg transition-colors cursor-pointer ${
+                        isActive
+                          ? "bg-slate-800 text-white shadow-3xs"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
+                    >
+                      {displayLabels[tab]}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Dynamic Schemas Fields Viewer */}
+              {(() => {
+                const schemaCollection = {
+                  users: {
+                    desc: "Registers master student records and preferences linked with secure bcrypt structures.",
+                    fields: [
+                      { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Unique index code" },
+                      { key: "email", type: "VARCHAR(255) (UNIQUE)", desc: "Verified student login email identity" },
+                      { key: "passwordHash", type: "VARCHAR(60)", desc: "Salted crypt password check string" },
+                      { key: "fullName", type: "VARCHAR(255)", desc: "User screen display name" },
+                      { key: "voiceSettings", type: "JSONB", desc: "User contrast settings and voice synthesizer preferences" },
+                      { key: "studyHours", type: "DECIMAL(5,2)", desc: "Calculated study accumulation statistics logs" }
+                    ]
+                  },
+                  notes: {
+                    desc: "Saves verified summaries extracted from academic materials.",
+                    fields: [
+                      { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Reference notes key identification code" },
+                      { key: "userId", type: "VARCHAR(9) (FOREIGN KEY)", desc: "Points back to corresponding Users.id account" },
+                      { key: "title", type: "VARCHAR(255)", desc: "Name label of parsed notes" },
+                      { key: "rawContent", type: "TEXT", desc: "Raw prompts / custom text" },
+                      { key: "summary", type: "TEXT (Markdown)", desc: "AI Overview breakdown structured text" },
+                      { key: "bulletPoints", type: "JSONB_ARRAY", desc: "High value takeaway lists" },
+                      { key: "easyExplanation", type: "TEXT", desc: "Simplified layperson explanation string" },
+                      { key: "examNotes", type: "TEXT", desc: "Syllabus test cheat notes summary" },
+                      { key: "keyDefinitions", type: "JSONB_ARRAY", desc: "Lookups array pairing study keywords and definition logs" }
+                    ]
+                  },
+                  quizzes: {
+                    desc: "Interactive multiple choice questions generated on-demand matching active lessons.",
+                    fields: [
+                      { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Testing module identifier code" },
+                      { key: "noteId", type: "VARCHAR(9)", desc: "Source notes mapping indicator" },
+                      { key: "userId", type: "VARCHAR(9)", desc: "Owner student key pointer" },
+                      { key: "title", type: "VARCHAR(255)", desc: "Challenge title details" },
+                      { key: "questions", type: "JSONB_OBJECT_ARRAY", desc: "List detailing answers options, corrections index, and interactive tutor clues" }
+                    ]
+                  },
+                  quizHistory: {
+                    desc: "Chronological grade archives tracking test answers performance.",
+                    fields: [
+                      { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Historic record entry primary key index" },
+                      { key: "quizId", type: "VARCHAR(9)", desc: "Evaluated testing model pointer" },
+                      { key: "userId", type: "VARCHAR(9)", desc: "Candidate user profile mapping" },
+                      { key: "title", type: "VARCHAR(255)", desc: "Interactive evaluation title description" },
+                      { key: "score", type: "SMALLINT", desc: "Candidate correct replies count" },
+                      { key: "totalQuestions", type: "SMALLINT", desc: "Total questions tested" },
+                      { key: "percentage", type: "DECIMAL(5,2)", desc: "Resulting grade percentile rank" }
+                    ]
+                  },
+                  chatSessions: {
+                    desc: "Saves conversational threads interacting with the AI Buddy companion helper.",
+                    fields: [
+                      { key: "id", type: "VARCHAR(9) (PRIMARY KEY)", desc: "Unique thread dialog indicator log" },
+                      { key: "userId", type: "VARCHAR(9)", desc: "Assigned candidate classmate pointer" },
+                      { key: "noteId", type: "VARCHAR(9)", desc: "Active note focus contextual coordinates links" },
+                      { key: "messages", type: "JSONB_ARRAY", desc: "Chronological timeline detailing sender status (user/ai), textual lines, and speech events logs" }
+                    ]
+                  }
+                };
+
+                const currentSchemaObj = schemaCollection[activeSchemaTab];
+
+                return (
+                  <div className="space-y-2 font-mono text-[10px] leading-relaxed animate-fadeIn">
+                    <p className="text-slate-500 font-sans italic text-[11px] mb-2">"{currentSchemaObj.desc}"</p>
+                    <div className="overflow-x-auto rounded-xl border border-gray-100">
+                      <table className="w-full text-left border-collapse bg-slate-50/40 text-[10.5px]">
+                        <thead>
+                          <tr className="bg-slate-100 border-b border-gray-200 text-slate-600 font-extrabold uppercase tracking-wider text-[9.5px]">
+                            <th className="py-2.5 px-3">Column Key</th>
+                            <th className="py-2.5 px-3">PostgreSQL Format</th>
+                            <th className="py-2.5 px-3 font-sans">Role / Purpose</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-150">
+                          {currentSchemaObj.fields.map((f) => (
+                            <tr key={f.key} className="hover:bg-slate-50 text-slate-700">
+                              <td className="py-2 px-3 text-[#0F766E] font-black">{f.key}</td>
+                              <td className="py-2 px-3 font-bold text-slate-550 text-[9.5px]">{f.type}</td>
+                              <td className="py-2 px-3 font-sans text-gray-600">{f.desc}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+          </div>
+        )}
       </div>
 
     </div>

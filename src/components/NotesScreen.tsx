@@ -71,6 +71,21 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
   // Interactive note items mastery checklist state (Phase 4 interactivity additions)
   const [masteredBullets, setMasteredBullets] = useState<Record<string, boolean>>({});
 
+  // Multilingual translation state
+  const [translating, setTranslating] = useState(false);
+  const [translationLanguage, setTranslationLanguage] = useState("Spanish");
+  const [translatedTextPopup, setTranslatedTextPopup] = useState<string | null>(null);
+
+  // Leitner spaced repetition flashcard states
+  const [isLeitnerMode, setIsLeitnerMode] = useState(false);
+  const [leitnerBoxes, setLeitnerBoxes] = useState<Record<string, number>>(() => {
+    const cached = localStorage.getItem("buddy_leitner_boxes");
+    return cached ? JSON.parse(cached) : {};
+  });
+  const [currentLeitnerBox, setCurrentLeitnerBox] = useState<number>(1);
+  const [currentFlashcardIndex, setCurrentFlashcardIndex] = useState(0);
+  const [isDefinitionVisible, setIsDefinitionVisible] = useState(false);
+
   // Trigger feedback hover audio
   const handleMouseEnterText = (label: string) => {
     if (voicePref.enabled) {
@@ -411,6 +426,97 @@ export default function NotesScreen({ token, voicePref }: NotesProps) {
         .join(". ")}`;
     }
     SpeechEngine.speak(textToRead, voicePref);
+  };
+
+  // Multilingual translation & speech recitation engine
+  const handleTranslateAndRecite = async () => {
+    if (!activeNote) return;
+    let textToTranslate = "";
+    if (detailTab === "summary") {
+      textToTranslate = activeNote.summary;
+    } else if (detailTab === "bullets") {
+      textToTranslate = activeNote.bulletPoints.join(". ");
+    } else if (detailTab === "exam") {
+      textToTranslate = activeNote.examNotes;
+    } else if (detailTab === "easy") {
+      textToTranslate = activeNote.easyExplanation;
+    } else if (detailTab === "definitions") {
+      textToTranslate = activeNote.keyDefinitions.map((k) => `${k.term}: ${k.definition}`).join(". ");
+    }
+
+    setTranslating(true);
+    setTranslatedTextPopup(null);
+    try {
+      const response = await fetch("/api/translate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({ text: textToTranslate, targetLanguage: translationLanguage })
+      });
+      if (!response.ok) {
+        throw new Error("Failed to translate via API");
+      }
+      const data = await response.json();
+      const translation = data.translatedText;
+      
+      setTranslatedTextPopup(translation);
+      
+      // Select appropriate browser voice flag if available
+      const voices = SpeechEngine.getAvailableVoices();
+      let matchedVoice = "";
+      const langLower = translationLanguage.toLowerCase();
+      if (langLower.includes("spanish") || langLower.includes("es")) {
+        matchedVoice = voices.find(v => v.lang.startsWith("es"))?.name || "";
+      } else if (langLower.includes("french") || langLower.includes("fr")) {
+        matchedVoice = voices.find(v => v.lang.startsWith("fr"))?.name || "";
+      } else if (langLower.includes("japanese") || langLower.includes("ja")) {
+        matchedVoice = voices.find(v => v.lang.startsWith("ja") || v.lang.startsWith("jp"))?.name || "";
+      } else if (langLower.includes("german") || langLower.includes("de")) {
+        matchedVoice = voices.find(v => v.lang.startsWith("de"))?.name || "";
+      }
+
+      SpeechEngine.speak(translation, {
+        ...voicePref,
+        voiceName: matchedVoice || voicePref.voiceName
+      });
+    } catch (err: any) {
+      console.error("Translation failed:", err);
+      SpeechEngine.speak("Sorry, translation encountered an issue. Let's study in primary english as default.", voicePref);
+    } finally {
+      setTranslating(false);
+    }
+  };
+
+  // Helper to get cards currently scheduled in specific Leitner box
+  const getLeitnerCardsForBox = (boxNum: number) => {
+    if (!activeNote || !activeNote.keyDefinitions) return [];
+    return activeNote.keyDefinitions.filter(def => {
+      const b = leitnerBoxes[def.term] || 1;
+      return b === boxNum;
+    });
+  };
+
+  // Helper to record easy / forgot progress on Leitner quiz cards
+  const handleLeitnerAnswer = (term: string, understood: boolean) => {
+    const currentBox = leitnerBoxes[term] || 1;
+    let nextBox = currentBox;
+    if (understood) {
+      nextBox = currentBox === 3 ? 3 : currentBox + 1;
+      SpeechEngine.speak(`Excellent! Promoted ${term} to Box ${nextBox}.`, voicePref);
+    } else {
+      nextBox = 1;
+      SpeechEngine.speak(`Returned ${term} to daily practice review Box 1.`, voicePref);
+    }
+
+    const updatedBoxes = { ...leitnerBoxes, [term]: nextBox };
+    setLeitnerBoxes(updatedBoxes);
+    localStorage.setItem("buddy_leitner_boxes", JSON.stringify(updatedBoxes));
+
+    // Shift to next flashcard element
+    setIsDefinitionVisible(false);
+    setCurrentFlashcardIndex((prev) => prev + 1);
   };
 
   // Export File format
@@ -871,6 +977,29 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                   <StopCircle className="w-4.5 h-4.5" />
                 </button>
 
+                {/* Custom Multilingual Audio Translation Selector */}
+                <div className="flex items-center gap-1 border border-[#0F766E]/20 bg-[#FFFBF5] rounded-xl px-2 py-0.5">
+                  <select
+                    value={translationLanguage}
+                    onChange={(e) => setTranslationLanguage(e.target.value)}
+                    className="text-[10px] font-bold bg-transparent border-none text-[#134E4A] focus:outline-none cursor-pointer"
+                    title="Select translation language"
+                  >
+                    <option value="Spanish">Spanish 🇪🇸</option>
+                    <option value="French">French 🇫🇷</option>
+                    <option value="Japanese">Japanese 🇯🇵</option>
+                    <option value="German">German 🇩🇪</option>
+                  </select>
+                  <button
+                    onClick={handleTranslateAndRecite}
+                    disabled={translating}
+                    className="px-2.5 py-1 bg-[#14B8A6] hover:bg-[#0F766E] disabled:opacity-50 text-white rounded-lg text-[10px] font-extrabold uppercase shrink-0 transition-colors cursor-pointer"
+                    title="Translate and Recite aloud in chosen language"
+                  >
+                    {translating ? "..." : "🔊 Translate"}
+                  </button>
+                </div>
+
                 {/* Print standard visual (PDF format generator) */}
                 <button
                   id="notes-btn-print"
@@ -961,6 +1090,23 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
 
               {/* SCREEN-ONLY VIEW INTERACTIVE LAYOUTS */}
               <div className="print:hidden">
+
+                {translatedTextPopup && (
+                  <div className="mb-6 p-4 rounded-2xl bg-teal-50 border border-teal-200 text-[#134E4A] relative animate-fadeIn">
+                    <button
+                      onClick={() => setTranslatedTextPopup(null)}
+                      className="absolute top-2 right-2 text-xs font-bold text-teal-700 hover:text-teal-900 cursor-pointer"
+                    >
+                      Dismiss ✕
+                    </button>
+                    <span className="text-[10px] font-bold text-[#0F766E] uppercase tracking-wider block mb-1">
+                      🗣️ AI Audio Guide Translation ({translationLanguage})
+                    </span>
+                    <p className="text-xs leading-relaxed font-semibold">
+                      {translatedTextPopup}
+                    </p>
+                  </div>
+                )}
                 
                 {/* 1. Summary overview page */}
                 {detailTab === "summary" && (
@@ -1051,39 +1197,200 @@ ${activeNote.keyDefinitions.map((d) => `* ${d.term}: ${d.definition}`).join("\n"
                         "{activeNote.easyExplanation}"
                       </p>
                     </div>
-                  </div>
-                )}
-
-                {/* 5. Key definitions dynamic flash dictionaries */}
+                    {/* 5. Key definitions dynamic flash dictionaries / Leitner flashcards */}
                 {detailTab === "definitions" && (
-                  <div className="space-y-4 animate-fadeIn">
-                    <div className="flex items-center justify-between">
+                  <div className="space-y-6 animate-fadeIn">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                       <div className="flex items-center gap-2">
                         <Layers className="w-5 h-5 text-[#0F766E]" />
-                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider font-sans">Definitions dictionary</h3>
+                        <h3 className="text-sm font-extrabold text-[#0F766E] uppercase tracking-wider font-sans">
+                          Definitions Dictionary
+                        </h3>
                       </div>
-                      <span className="text-[10px] text-[#0F766E] font-black uppercase">Study definitions</span>
-                    </div>
-                    <div className="h-0.5 bg-gradient-to-r from-[#0F766E]/10 to-transparent w-full" />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {activeNote.keyDefinitions.map((def, idx) => (
-                        <div
-                          key={idx}
-                          onMouseEnter={() => handleMouseEnterText(`${def.term}: ${def.definition}`)}
-                          className="p-4 rounded-2xl border border-[#0F766E]/10 bg-[#FFFBF5] hover:border-[#0F766E] hover:bg-white transition-all space-y-1.5 relative group"
+                      
+                      {/* Active Leitner Toggles */}
+                      <div className="flex items-center gap-1.5 p-1 bg-gray-100 rounded-xl">
+                        <button
+                          onClick={() => {
+                            setIsLeitnerMode(false);
+                            SpeechEngine.speak("Switched to standard definition dictionary mode.", voicePref);
+                          }}
+                          className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-widest rounded-lg cursor-pointer transition-colors ${
+                            !isLeitnerMode
+                              ? "bg-white text-[#0F766E] shadow-xs cursor-pointer"
+                              : "text-gray-500 hover:text-[#0F766E]"
+                          }`}
                         >
-                          <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-widest font-mono">TERM DEFINED</span>
-                          <h4 className="text-xs uppercase tracking-widest font-black text-[#0F766E]">
-                            {def.term}
-                          </h4>
-                          <p className="text-xs text-[#134E4A]/80 leading-relaxed font-semibold">
-                            {def.definition}
-                          </p>
-                        </div>
-                      ))}
+                          📚 Dictionary List
+                        </button>
+                        <button
+                          onClick={() => {
+                            setIsLeitnerMode(true);
+                            setCurrentFlashcardIndex(0);
+                            setIsDefinitionVisible(false);
+                            SpeechEngine.speak("Welcome to your Leitner Spaced Repetition flashcard trainer! Review daily cards in Box 1.", voicePref);
+                          }}
+                          className={`px-3 py-1.5 text-[10px] uppercase font-black tracking-widest rounded-lg cursor-pointer transition-colors ${
+                            isLeitnerMode
+                              ? "bg-white text-[#0F766E] shadow-xs cursor-pointer"
+                              : "text-gray-500 hover:text-[#0F766E]"
+                          }`}
+                        >
+                          🧠 Leitner Trainer
+                        </button>
+                      </div>
                     </div>
+
+                    {!isLeitnerMode ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {activeNote.keyDefinitions.map((def, idx) => (
+                          <div
+                            key={idx}
+                            onMouseEnter={() => handleMouseEnterText(`${def.term}: ${def.definition}`)}
+                            className="p-4 rounded-2xl border border-[#0F766E]/10 bg-[#FFFBF5] hover:border-[#0F766E] hover:bg-white transition-all space-y-1.5 relative group"
+                          >
+                            <span className="text-[10px] text-emerald-700 font-extrabold uppercase tracking-widest font-mono">TERM DEFINED</span>
+                            <h4 className="text-xs uppercase tracking-widest font-black text-[#0F766E]">
+                              {def.term}
+                            </h4>
+                            <p className="text-xs text-[#134E4A]/80 leading-relaxed font-semibold">
+                              {def.definition}
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      // Leitner Spaced Repetition Workspace view
+                      <div className="space-y-6">
+                        {/* Leitner Box Selectors Tabs */}
+                        <div className="grid grid-cols-3 gap-2">
+                          {[1, 2, 3].map((boxNum) => {
+                            const count = getLeitnerCardsForBox(boxNum).length;
+                            const isActive = currentLeitnerBox === boxNum;
+                            return (
+                              <button
+                                key={boxNum}
+                                onClick={() => {
+                                  setCurrentLeitnerBox(boxNum);
+                                  setCurrentFlashcardIndex(0);
+                                  setIsDefinitionVisible(false);
+                                  SpeechEngine.speak(`Viewing Leitner Box ${boxNum}. It contains ${count} study cards to recall.`, voicePref);
+                                }}
+                                className={`p-2.5 rounded-2xl border text-center cursor-pointer transition-all ${
+                                  isActive
+                                    ? "bg-[#0F766E] text-white border-[#0F766E] font-black shadow-xs cursor-pointer"
+                                    : "bg-[#FFFBF5] hover:bg-amber-50 text-[#134E4A] border-[#0F766E]/10"
+                                }`}
+                              >
+                                <span className="block text-[10px] font-black uppercase tracking-wider">
+                                  Box {boxNum === 1 ? "1 (Daily)" : boxNum === 2 ? "2 (3 Days)" : "3 (Mastered)"}
+                                </span>
+                                <span className="text-[11px] font-bold block mt-0.5">
+                                  {count} {count === 1 ? "card" : "cards"}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Flashcard Active Panel Card */}
+                        {(() => {
+                          const activeBoxCards = getLeitnerCardsForBox(currentLeitnerBox);
+                          if (activeBoxCards.length === 0) {
+                            return (
+                              <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-8 text-center space-y-2 animate-fadeIn">
+                                <span className="text-2xl">🎉</span>
+                                <h4 className="text-sm font-black text-emerald-900 uppercase">Box {currentLeitnerBox} Empty!</h4>
+                                <p className="text-xs text-emerald-800 font-semibold max-w-sm mx-auto">
+                                  No cards scheduled in this box. Keep testing your memory recall to build permanent neural pathways!
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          const safeIndex = currentFlashcardIndex % activeBoxCards.length;
+                          const card = activeBoxCards[safeIndex];
+
+                          return (
+                            <div className="bg-[#FFFBF5] border border-[#0F766E]/15 rounded-3xl p-6 md:p-8 hover:border-[#0F766E] transition-all space-y-6">
+                              <div className="flex justify-between items-center text-[10px] font-bold text-gray-500 uppercase tracking-widest">
+                                <span>Playing Leitner Flashcards</span>
+                                <span>Card {safeIndex + 1} of {activeBoxCards.length}</span>
+                              </div>
+
+                              <div className="space-y-4 text-center py-6">
+                                <span className="text-[10px] text-teal-800 font-extrabold uppercase tracking-widest block">FRONT OF FLASHCARD</span>
+                                <h3 className="text-md font-black text-[#134E4A] tracking-wider uppercase">
+                                  {card.term}
+                                </h3>
+
+                                <div className="h-px bg-dashed border-gray-200/60 my-6" />
+
+                                {isDefinitionVisible ? (
+                                  <div className="space-y-1 animate-fadeIn">
+                                    <span className="text-[10px] text-emerald-700 font-black uppercase tracking-widest block">REVEALED DEFINITION</span>
+                                    <p className="text-xs text-[#134E4A] font-semibold leading-relaxed max-w-xl mx-auto">
+                                      {card.definition}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setIsDefinitionVisible(true);
+                                      SpeechEngine.speak(card.term + ", defined as: " + card.definition, voicePref);
+                                    }}
+                                    className="px-6 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-black uppercase tracking-widest rounded-xl transition-colors cursor-pointer"
+                                  >
+                                    🔍 Reveal Definition
+                                  </button>
+                                )}
+                              </div>
+
+                              {isDefinitionVisible && (
+                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
+                                  <button
+                                    onClick={() => handleLeitnerAnswer(card.term, false)}
+                                    className="p-3 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer transition-colors border border-red-200 text-center"
+                                  >
+                                    ❌ Forgot / Hard (To Box 1)
+                                  </button>
+                                  <button
+                                    onClick={() => handleLeitnerAnswer(card.term, true)}
+                                    className="p-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-black uppercase tracking-widest rounded-2xl cursor-pointer transition-colors border border-emerald-200 text-center"
+                                  >
+                                    ✓ Remembered / Easy (Box +1)
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+
+                        {/* Leitner boxes global stats summary */}
+                        <div className="p-4 rounded-2xl bg-[#FFFBF5]/40 border border-slate-100 space-y-3">
+                          <h4 className="text-[10px] font-black text-[#0F766E] uppercase tracking-widest">
+                            🧠 Spaced Repetition Neural Mastery Dashboard
+                          </h4>
+                          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                            <div className="bg-red-50 border border-red-100 rounded-xl p-2">
+                              <span className="text-[9px] uppercase font-bold text-red-600 tracking-wider">Box 1 (Daily)</span>
+                              <strong className="block text-[#134E4A] font-black mt-0.5">{getLeitnerCardsForBox(1).length}</strong>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-2">
+                              <span className="text-[9px] uppercase font-bold text-blue-600 tracking-wider">Box 2 (3 Days)</span>
+                              <strong className="block text-[#134E4A] font-black mt-0.5">{getLeitnerCardsForBox(2).length}</strong>
+                            </div>
+                            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2">
+                              <span className="text-[9px] uppercase font-bold text-emerald-600 tracking-wider">Box 3 (Mastered)</span>
+                              <strong className="block text-[#134E4A] font-black mt-0.5">{getLeitnerCardsForBox(3).length}</strong>
+                            </div>
+                          </div>
+                        </div>
+
+                      </div>
+                    )}
                   </div>
+                )}                </div>
                 )}
 
               </div>

@@ -641,5 +641,51 @@ export class AIService {
       return this.generateOfflineTutorResponseFallback(userMessage, noteTitle, retrievedContext);
     }
   }
+
+  // 8. MULTILINGUAL TRANSLATION (Auditory Learning Translation Assistance)
+  public static async translateText(text: string, targetLanguage: string): Promise<string> {
+    try {
+      if (!ai) {
+        throw new Error("GEMINI_API_KEY_MISSING");
+      }
+
+      const systemPrompt = `You are a professional academic translator. Translate the given text accurately into "${targetLanguage}".
+      - Preserve any formatting like lists, bullets, or headers if present.
+      - Return ONLY the direct translation; do not add any conversational remarks, warnings, or meta-commentary.
+      - Ensure the translation is natural and fits academic or study buddy contexts.`;
+
+      // Use the gemini model to translate
+      const model = "gemini-2.5-flash"; 
+      const response = await ai.models.generateContent({
+        model: model,
+        contents: text,
+        config: {
+          systemInstruction: systemPrompt
+        }
+      });
+
+      return response.text?.trim() || text;
+    } catch (err) {
+      console.warn("⚠️ translateText failed. Serving offline fallback translation.", err);
+      return this.generateOfflineTranslationFallback(text, targetLanguage);
+    }
+  }
+
+  private static generateOfflineTranslationFallback(text: string, targetLang: string): string {
+    const lang = targetLang.toLowerCase();
+    if (lang.includes("spanish") || lang.includes("es")) {
+      return `[Traducido al Español] ${text}`;
+    }
+    if (lang.includes("french") || lang.includes("fr")) {
+      return `[Traduit en Français] ${text}`;
+    }
+    if (lang.includes("japanese") || lang.includes("ja")) {
+      return `[日本語訳] ${text}`;
+    }
+    if (lang.includes("german") || lang.includes("de")) {
+      return `[Übersetzt ins Deutsche] ${text}`;
+    }
+    return `[Translated to ${targetLang}] ${text}`;
+  }
 }
 

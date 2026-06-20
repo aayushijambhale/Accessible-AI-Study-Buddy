@@ -189,8 +189,8 @@ export default function Header({
               : "bg-[#FFFBF5] border-[#0F766E]/15 text-[#0F766E] hover:bg-[#14B8A6]/15"
           }`}
         >
-          <Mic className="w-5 h-5" />
-          <span className="text-xs font-bold hidden md:inline">Voice Control</span>
+          <Mic className="w-5 h-5 animate-pulse" />
+          <span className="text-xs font-bold">🎤 Start Speaking</span>
         </button>
 
         {/* Screen Reader Hover Mode toggle */}

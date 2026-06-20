@@ -19,10 +19,23 @@ import { SpeechEngine } from "./utils/speech";
 
 export default function App() {
   // Persistence layers
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("buddy_auth_token"));
+  const [token, setToken] = useState<string | null>(() => {
+    const raw = localStorage.getItem("buddy_auth_token");
+    if (!raw || raw === "null" || raw === "undefined" || raw.trim() === "") {
+      return null;
+    }
+    return raw;
+  });
   const [user, setUser] = useState<UserProfile | null>(() => {
     const cached = localStorage.getItem("buddy_user_profile");
-    return cached ? JSON.parse(cached) : null;
+    if (!cached || cached === "null" || cached === "undefined") {
+      return null;
+    }
+    try {
+      return JSON.parse(cached);
+    } catch {
+      return null;
+    }
   });
   const [isStarted, setIsStarted] = useState<boolean>(() => {
     return localStorage.getItem("buddy_app_started") === "true";
@@ -103,6 +116,18 @@ export default function App() {
         });
     }
   }, [token]);
+
+  // Cleanly log out whenever any sub-screen encounters a 401 or 403 response code
+  useEffect(() => {
+    const handleUnauthorizedToken = () => {
+      console.warn("Unauthorized token detected. Safely resetting authentication state.");
+      handleLogout();
+    };
+    window.addEventListener("unauthorized-token", handleUnauthorizedToken);
+    return () => {
+      window.removeEventListener("unauthorized-token", handleUnauthorizedToken);
+    };
+  }, []);
 
   // Handle live global profile updates from Phase 2 settings panel
   useEffect(() => {
